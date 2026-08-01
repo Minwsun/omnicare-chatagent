@@ -123,7 +123,7 @@ class Repository:
             JOIN "KnowledgeDocument" d ON d.id = v."documentId"
             LEFT JOIN "KnowledgeSourcePage" sp ON sp."knowledgeDocumentId" = d.id
             WHERE d.locale = $2 AND (d.visibility = 'PUBLIC' OR ($4 = 'CUSTOMER_AUTHENTICATED' AND d.visibility = 'CUSTOMER_AUTHENTICATED')) AND v.status = 'PUBLISHED'
-              AND d.marketplace = 'SHOPEE' AND c."retrievalEnabled" = true
+              AND d."archivedAt" IS NULL AND c."retrievalEnabled" = true
               AND v.searchable = true AND v."effectiveFrom" <= now()
               AND (v."effectiveTo" IS NULL OR v."effectiveTo" > now())
               AND (to_tsvector('simple', v.title) @@ plainto_tsquery('simple', $1) OR to_tsvector('simple', c.content) @@ plainto_tsquery('simple', $1))
@@ -146,7 +146,7 @@ class Repository:
             LEFT JOIN "KnowledgeSourcePage" sp ON sp."knowledgeDocumentId"=d.id
             WHERE c.embedding IS NOT NULL AND d.locale=$2
               AND (d.visibility='PUBLIC' OR ($4='CUSTOMER_AUTHENTICATED' AND d.visibility='CUSTOMER_AUTHENTICATED'))
-              AND v.status='PUBLISHED' AND c."retrievalEnabled"=true AND v.searchable=true
+              AND d."archivedAt" IS NULL AND v.status='PUBLISHED' AND c."retrievalEnabled"=true AND v.searchable=true
               AND v."effectiveFrom"<=now() AND (v."effectiveTo" IS NULL OR v."effectiveTo">now())
             ORDER BY c.embedding <=> $1::vector, d."authorityLevel" DESC LIMIT $3
         ''', embedding, locale, limit, visibility)
@@ -221,7 +221,7 @@ class Repository:
             JOIN "KnowledgeDocument" d ON d.id = v."documentId"
             LEFT JOIN "KnowledgeSourcePage" sp ON sp."knowledgeDocumentId" = d.id
             WHERE d.locale = $2 AND (d.visibility = 'PUBLIC' OR ($4 = 'CUSTOMER_AUTHENTICATED' AND d.visibility = 'CUSTOMER_AUTHENTICATED')) AND v.status = 'PUBLISHED' AND v.searchable = true
-              AND d.marketplace = 'SHOPEE' AND k."retrievalEnabled" = true
+              AND d."archivedAt" IS NULL AND k."retrievalEnabled" = true
               AND v."effectiveFrom" <= now() AND (v."effectiveTo" IS NULL OR v."effectiveTo" > now())
             GROUP BY d.id, v.id, k.id, sp.url
             ORDER BY score DESC, d."authorityLevel" DESC

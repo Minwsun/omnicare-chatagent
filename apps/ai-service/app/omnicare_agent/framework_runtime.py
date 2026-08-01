@@ -206,6 +206,8 @@ class LangChainAgentRuntime:
         response = await self._ensure_grounded_citations(message, self._convert(message, state.values))
         if streamed_answer:
             response.answer = self._sanitize_language("".join(streamed_answer))
+        elif response.answer:
+            yield "token", response.answer
         yield "done", response
 
     async def _prepare_message(self, message: IncomingMessage) -> IncomingMessage:
