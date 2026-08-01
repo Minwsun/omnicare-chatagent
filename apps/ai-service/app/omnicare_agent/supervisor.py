@@ -180,6 +180,9 @@ class SupervisorHarness:
         mapping = personalized_policy_map.get(heuristic)
         if message.customer_id and mapping and not any(term in normalized for term in policy_terms) and any(term in normalized for term in mapping[1]):
             heuristic = mapping[0]
+        generic_policy_cues = ("thời gian", "bao lâu", "điều kiện", "quy trình", "phí", "phạm vi", "trường hợp nào")
+        if deterministic_intent in {"RETURN_POLICY", "REFUND_POLICY", "SHIPPING_POLICY", "PAYMENT_POLICY", "PRIVACY"} and not state.get("order_id") and any(term in normalized for term in generic_policy_cues):
+            heuristic = deterministic_intent
         if state.get("order_id") and not any(term in normalized for term in ("chính sách", "quy định", "điều khoản", "nói chung")):
             heuristic = {
                 "PAYMENT_POLICY": "PAYMENT_STATUS",

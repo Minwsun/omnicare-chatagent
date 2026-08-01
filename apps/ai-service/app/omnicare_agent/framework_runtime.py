@@ -173,6 +173,7 @@ class LangChainAgentRuntime:
         yield "context_loaded", {"facts": len(runtime_context.memory_facts), "openTickets": len(runtime_context.open_tickets), "incidents": len(runtime_context.active_incidents), "activeContext": runtime_context.conversation_memory.get("activeContext", {})}
         config = {"configurable": {"thread_id": message.conversation_id}}
         started_tools: set[str] = set()
+        streamed_answer: list[str] = []
         with bind_tool_context(context.tool_context()):
             async for event in self.agent.astream(
                 {"messages": [HumanMessage(content=self._input_content(message))]},
@@ -192,6 +193,7 @@ class LangChainAgentRuntime:
                                 started_tools.add(name)
                                 yield "tool_started", {"tools": [name]}
                         if isinstance(chunk.content, str) and chunk.content and not chunk.tool_call_chunks:
+                            streamed_answer.append(chunk.content)
                             yield "token", chunk.content
                 elif event_type == "updates" and isinstance(data, dict):
                     for update in data.values():
@@ -201,7 +203,10 @@ class LangChainAgentRuntime:
                         if completed:
                             yield "tool_completed", {"tools": completed}
         state = await self.agent.aget_state(config)
-        yield "done", await self._ensure_grounded_citations(message, self._convert(message, state.values))
+        response = await self._ensure_grounded_citations(message, self._convert(message, state.values))
+        if streamed_answer:
+            response.answer = self._sanitize_language("".join(streamed_answer))
+        yield "done", response
 
     async def _prepare_message(self, message: IncomingMessage) -> IncomingMessage:
         prepared = await self.supervisor.prepare(message)
@@ -293,6 +298,10 @@ class LangChainAgentRuntime:
         if not isinstance(output, SupportAgentOutput):
             output = SupportAgentOutput(answer=self._last_answer(messages), confidence=0.5)
         tool_calls, tool_payloads = self._tool_results(messages)
+        ownership_failure = next((payload for _, payload in tool_payloads if payload.get("error_code") == "ORDER_NOT_ACCESSIBLE"), None)
+        if ownership_failure:
+            output.requires_human = True
+            output.escalation_reason = "ORDER_OWNERSHIP_VERIFICATION_FAILED"
         output.intent = self._infer_intent(output.intent, tool_payloads, tool_calls)
         output.intent = self._reconcile_text_intent(message, output.intent)
         self._infer_requested_action(message, output, tool_payloads)
@@ -585,7 +594,9 @@ class LangChainAgentRuntime:
     async def _ensure_grounded_citations(message: IncomingMessage, response: GroundedAgentResponse) -> GroundedAgentResponse:
         if response.citations or response.requires_human or response.intent not in {None, "KNOWLEDGE", "RETURN_POLICY", "REFUND_POLICY", "PAYMENT_POLICY", "SHIPPING_POLICY", "VOUCHER", "PRIVACY", "ACCOUNT_SECURITY", "TECHNICAL_SUPPORT"}:
             return response
-        results = await retrieve(RetrievalRequest(query=message.content, locale=message.locale, visibility="CUSTOMER_AUTHENTICATED", limit=4))
+        semantic_route = (message.page_context or {}).get("semanticRoute") or {}
+        profile = response.intent or semantic_route.get("primary_intent")
+        results = await retrieve(RetrievalRequest(query=message.content, locale=message.locale, visibility="CUSTOMER_AUTHENTICATED", profile=profile, limit=4))
         if not results:
             return response
         response.citations = [Citation(document_id=item.document_id, title=item.title, section=item.section, version=item.semantic_version, effective_from=item.effective_from.date(), public_url=item.public_url, snippet=item.content[:500], score=item.score) for item in results if item.public_url][:4]

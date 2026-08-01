@@ -190,6 +190,23 @@ class FrameworkRuntimeTests(unittest.TestCase):
         self.assertEqual(citations[0]["effective_from"], "2026-01-01")
         self.assertEqual(citations[0]["score"], 0.94)
 
+    def test_foreign_order_result_requires_handoff(self):
+        runtime = object.__new__(LangChainAgentRuntime)
+        message = IncomingMessage(message_id="foreign", content="xem đơn ORD-OTHER", customer_id="customer_001", conversation_id="conversation")
+        response = runtime._convert(message, {
+            "messages": [
+                HumanMessage(content="xem đơn ORD-OTHER"),
+                ToolMessage(
+                    content='{"status":"FORBIDDEN","error_code":"ORDER_NOT_ACCESSIBLE"}',
+                    name="get_order_details",
+                    tool_call_id="tool-foreign",
+                ),
+            ],
+            "structured_response": SupportAgentOutput(answer="Không thể xác minh đơn hàng.", intent="ORDER_TRACKING"),
+        })
+        self.assertTrue(response.requires_human)
+        self.assertEqual(response.escalation_reason, "ORDER_OWNERSHIP_VERIFICATION_FAILED")
+
 
 if __name__ == "__main__":
     unittest.main()
