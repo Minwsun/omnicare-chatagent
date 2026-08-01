@@ -50,7 +50,19 @@ class Repository:
 
     async def shipment_status(self, customer_id: str, order_id: str) -> Optional[Dict[str, Any]]:
         await self.connect()
-        row = await self.pool.fetchrow('SELECT s.id, s.carrier, s."trackingMasked", s.status, s."estimatedDelivery", s."observedAt" FROM "Shipment" s JOIN "Order" o ON o.id = s."orderId" WHERE s."orderId" = $1 AND o."customerId" = $2 ORDER BY s."observedAt" DESC LIMIT 1', order_id, customer_id)
+        row = await self.pool.fetchrow(r'''
+            SELECT o.id AS "orderId", s.id, s.carrier, s."trackingMasked", s.status,
+                   s."estimatedDelivery", s."observedAt"
+            FROM "Order" o
+            LEFT JOIN LATERAL (
+              SELECT id, carrier, "trackingMasked", status, "estimatedDelivery", "observedAt"
+              FROM "Shipment"
+              WHERE "orderId" = o.id
+              ORDER BY "observedAt" DESC
+              LIMIT 1
+            ) s ON true
+            WHERE o.id = $1 AND o."customerId" = $2
+        ''', order_id, customer_id)
         return dict(row) if row else None
 
     async def payment_status(self, customer_id: str, order_id: str) -> Optional[Dict[str, Any]]:

@@ -61,11 +61,14 @@ async def get_order_details(context: ToolContext, order_id: str, store: Reposito
 
 
 async def get_shipping_status(context: ToolContext, order_id: str, store: Repository = repository) -> ToolResult:
-    ownership = await get_order_details(context, order_id, store)
-    if ownership.status != ToolStatus.SUCCESS:
-        return ownership
+    if not context.customer_id:
+        return _result(ToolStatus.FORBIDDEN, error_code="IDENTITY_REQUIRED")
     data = await store.shipment_status(context.customer_id, order_id)
-    return _result(ToolStatus.SUCCESS, data) if data else _result(ToolStatus.NOT_FOUND, error_code="SHIPMENT_NOT_FOUND", safe_message="Đơn hàng chưa có thông tin vận chuyển.")
+    if not data:
+        return _result(ToolStatus.FORBIDDEN, error_code="ORDER_NOT_ACCESSIBLE", safe_message="Không thể xác minh đơn hàng này.")
+    if not data.get("id"):
+        return _result(ToolStatus.NOT_FOUND, error_code="SHIPMENT_NOT_FOUND", safe_message="Đơn hàng chưa có thông tin vận chuyển.")
+    return _result(ToolStatus.SUCCESS, data)
 
 
 async def get_payment_status(context: ToolContext, order_id: str, store: Repository = repository) -> ToolResult:
