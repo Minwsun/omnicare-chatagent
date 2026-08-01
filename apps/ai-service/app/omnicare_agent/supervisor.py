@@ -113,6 +113,15 @@ class SupervisorHarness:
                 "semantic_ambiguities": [],
                 "understanding_fallback": False,
             }
+        if heuristic != "KNOWLEDGE":
+            return {
+                "canonical_query": normalized,
+                "semantic_intent": heuristic,
+                "semantic_confidence": 0.96,
+                "semantic_entities": {"orderId": state.get("order_id")} if state.get("order_id") else {},
+                "semantic_ambiguities": [],
+                "understanding_fallback": False,
+            }
         prompt = (
             "Hiểu yêu cầu CSKH thương mại điện tử dù người dùng viết sai chính tả, thiếu dấu hoặc dùng câu nối tiếp. "
             "Chỉ trả JSON gồm canonical_query, user_goal, primary_intent, confidence, entities, ambiguities. "

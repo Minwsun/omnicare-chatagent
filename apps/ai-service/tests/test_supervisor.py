@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from app.omnicare_agent.runtime import classify, normalize_order_id, normalize_support_text
 from app.omnicare_agent.supervisor import RouteDecision, SupervisorHarness
@@ -28,6 +29,24 @@ class SemanticStubSupervisorHarness(SupervisorHarness):
 
 
 class SupervisorHarnessTests(unittest.IsolatedAsyncioTestCase):
+    async def test_clear_intent_skips_llm_understanding(self):
+        from app.contracts import IncomingMessage
+
+        harness = SupervisorHarness(classify, normalize_support_text, normalize_order_id)
+        state = {
+            "message": IncomingMessage(
+                message_id="fast-route", content="đơn ORD-1003 đang ở đâu?", customer_id="customer_001",
+                channel="WEB", conversation_id="fast-route-conversation",
+            ).model_dump(mode="json"),
+            "normalized_query": "đơn ord-1003 đang ở đâu",
+            "order_id": "ORD-1003",
+            "blocked": False,
+        }
+        with patch("app.omnicare_agent.supervisor.configured_model", side_effect=AssertionError("LLM must not be called")):
+            result = await harness._understand(state)
+        self.assertEqual(result["semantic_intent"], "ORDER_TRACKING")
+        self.assertEqual(result["semantic_confidence"], 0.96)
+
     async def test_clear_transaction_route_avoids_fallback(self):
         from app.contracts import IncomingMessage
 

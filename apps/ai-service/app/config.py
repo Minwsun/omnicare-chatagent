@@ -25,6 +25,12 @@ class Settings:
     graphrag_worker_enabled = os.getenv("GRAPHRAG_WORKER_ENABLED", "true").lower() == "true"
     graphrag_worker_concurrency = int(os.getenv("GRAPHRAG_WORKER_CONCURRENCY", "4"))
     graphrag_poll_seconds = float(os.getenv("GRAPHRAG_POLL_SECONDS", "2"))
+    agent_max_model_calls = int(os.getenv("AGENT_MAX_MODEL_CALLS", "2"))
+    retrieval_token_budget = int(os.getenv("RETRIEVAL_TOKEN_BUDGET", "1200"))
+    retrieval_max_chunks = int(os.getenv("RETRIEVAL_MAX_CHUNKS", "3"))
+    lexical_fast_path_score = float(os.getenv("LEXICAL_FAST_PATH_SCORE", "0.05"))
+    embedding_cache_ttl_seconds = int(os.getenv("EMBEDDING_CACHE_TTL_SECONDS", "1800"))
+    embedding_cache_max_entries = int(os.getenv("EMBEDDING_CACHE_MAX_ENTRIES", "2000"))
     web_origin = os.getenv("WEB_ORIGIN", "http://localhost:3000")
 
 

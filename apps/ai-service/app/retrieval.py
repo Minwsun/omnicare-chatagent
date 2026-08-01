@@ -5,6 +5,7 @@ from typing import List
 
 from .brand import omni_brand_text
 from .contracts import QueryPlan, RetrievalRequest, RetrievalResult
+from .config import settings
 from .embeddings import embed_texts, vector_literal
 from .repositories import Repository, repository
 
@@ -150,7 +151,7 @@ def build_search_queries(request: RetrievalRequest, plan: QueryPlan, focused: li
     concept_queries = [CONCEPT_QUERIES[concept] for concept in plan.concepts if concept in CONCEPT_QUERIES]
     expansions = [term for term in profile_terms if normalize_text(term) not in normalize_text(request.query)][:1]
     discriminative_terms = sorted(set(focused), key=lambda term: (-len(term), term))[:2]
-    return list(dict.fromkeys([*proposition_queries, *concept_queries, *expansions, *discriminative_terms]))[:6] or [request.query]
+    return list(dict.fromkeys([*proposition_queries, *concept_queries, *expansions, *discriminative_terms]))[:3] or [request.query]
 
 
 async def retrieve(request: RetrievalRequest, store: Repository = repository) -> List[RetrievalResult]:
@@ -164,16 +165,20 @@ async def retrieve(request: RetrievalRequest, store: Repository = repository) ->
     concept_queries = [CONCEPT_QUERIES[concept] for concept in plan.concepts if concept in CONCEPT_QUERIES]
     ranking_terms = list(dict.fromkeys([*focused, *(word for query in concept_queries for word in re.findall(r"[\wÀ-ỹ]+", query.lower(), flags=re.UNICODE))]))
     queries = build_search_queries(request, plan, focused, profile_terms)
-    query_vector = ""
-    try:
-        vectors = await embed_texts([request.query])
-        query_vector = vector_literal(vectors[0]) if vectors else ""
-    except Exception:
-        query_vector = ""
-    text_batches, vector_batch = await asyncio.gather(
-        asyncio.gather(*(store.search_knowledge(query, request.locale, request.limit * 2, request.visibility) for query in queries)),
-        store.search_knowledge_vector(query_vector, request.locale, request.limit * 3, request.visibility) if hasattr(store, "search_knowledge_vector") else asyncio.sleep(0, result=[]),
+    text_batches = await asyncio.gather(*(store.search_knowledge(query, request.locale, request.limit * 2, request.visibility) for query in queries))
+    lexical_rows = [row for rows in text_batches for row in rows]
+    lexical_is_strong = (
+        len({row["chunk_id"] for row in lexical_rows}) >= min(request.limit, settings.retrieval_max_chunks)
+        and max((float(row.get("score") or 0) for row in lexical_rows), default=0) >= settings.lexical_fast_path_score
     )
+    vector_batch = []
+    if not lexical_is_strong and hasattr(store, "search_knowledge_vector"):
+        try:
+            vectors = await embed_texts([request.query])
+            if vectors:
+                vector_batch = await store.search_knowledge_vector(vector_literal(vectors[0]), request.locale, request.limit * 3, request.visibility)
+        except Exception:
+            vector_batch = []
     merged: dict[str, dict] = {}
     for channel, weight, batches in (("FULL_TEXT", 1.0, text_batches),):
         for rows in batches:
@@ -223,13 +228,13 @@ async def retrieve(request: RetrievalRequest, store: Repository = repository) ->
     context_tokens = 0
     for item in results:
         estimated_tokens = max(1, item.compressed_length // 4)
-        if selected and context_tokens + estimated_tokens > 4000:
+        if selected and context_tokens + estimated_tokens > settings.retrieval_token_budget:
             continue
         item.score_breakdown["context_token_estimate"] = estimated_tokens
-        item.score_breakdown["context_token_budget"] = 4000
+        item.score_breakdown["context_token_budget"] = settings.retrieval_token_budget
         selected.append(item)
         context_tokens += estimated_tokens
-        if len(selected) >= min(request.limit, 12):
+        if len(selected) >= min(request.limit, settings.retrieval_max_chunks):
             break
     for item in selected:
         item.score_breakdown["selected_context_tokens"] = context_tokens
