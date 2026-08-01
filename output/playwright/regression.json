@@ -1,0 +1,35 @@
+{
+  "generatedAt": "2026-07-31T03:45:35.840Z",
+  "passed": 5,
+  "failed": 0,
+  "results": [
+    {
+      "id": "AUTH-ADMIN",
+      "status": "PASS",
+      "actual": "http://localhost:3000/admin"
+    },
+    {
+      "id": "GRAPH-PUBLISHED-PREVIEW",
+      "status": "PASS",
+      "actual": {
+        "graphNodes": 3,
+        "graphStatus": "Published Graph · chỉ đọc"
+      }
+    },
+    {
+      "id": "AUTH-USER",
+      "status": "PASS",
+      "actual": "http://localhost:3000/portal"
+    },
+    {
+      "id": "CHAT-STREAM-DONE",
+      "status": "PASS",
+      "actual": "Có 2 phần đã xác nhận: chưa nhận hàng thì không cần bằng chứng; đã nhận hàng mà hàng có vấn đề thì nên có video mở kiện.\n\nBằng chứng nên chuẩn bị:\n- Video mở kiện hàng: được khuyến khích nhất\n- Quay rõ 6 mặt kiện hàng\n- Thấy rõ mã vận đơn trên kiện, khớp với đơn hàng\n- Nếu phải gửi trả sản phẩm, nên quay thêm video đóng kiện hàng hoàn trả\n\nPhần điều kiện trả hàng cụ thể theo từng trường hợp thì mình chưa kiểm tra được thông tin chi tiết trong tài liệu này. Nếu bạn muốn, mình có thể tóm tiếp phần quy trình nộp yêu cầu hoặc phần trường hợp cần bổ sung bằng chứng.\n\nNguồn: [Nguồn SHOPEE] [Trả hàng/ Hoàn tiền] Quy trình Shopee xử lý yêu cầu Trả hàng/ Hoàn tiền\nNguồn: [Nguồn SHOPEE] [Trả hàng/Hoàn tiền] Hướng dẫn chuẩn bị bằng chứng khi yêu cầu Trả hàng/ Hoàn tiền\nNguồn: [Nguồn SHOPEE] [Trả hàng/ Hoàn tiền] Các phương thức gửi hàng hoàn trả và phí hoàn trả\nNguồn: [Nguồn SHOPEE] [Trả hàng/Hoàn tiền] Cẩm nang Trả hàng hoàn tiền"
+    },
+    {
+      "id": "CHAT-CITATIONS",
+      "status": "PASS",
+      "actual": 4
+    }
+  ]
+}

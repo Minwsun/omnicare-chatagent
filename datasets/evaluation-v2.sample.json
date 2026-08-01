@@ -1,0 +1,40 @@
+[
+  {
+    "id": "order-followup-001",
+    "cluster_id": "order-followup",
+    "split": "DEVELOPMENT",
+    "category": "ORDER",
+    "customer_id": "customer_001",
+    "conversation_id": "conv_history_001",
+    "turns": [
+      {"message": "Cho tôi xem các đơn đang giao"},
+      {"message": "Chọn đơn đang giao", "select_option_index": 1, "expected_active_order_id": "ORD-1001"}
+    ],
+    "expected": {
+      "intents": ["ORDER_TRACKING"],
+      "required_tools": ["get_recent_orders", "get_shipping_status"],
+      "allowed_tools": ["get_recent_orders", "get_order_details", "get_shipping_status"],
+      "model_profile": "fast",
+      "max_tool_calls": 5
+    },
+    "tags": ["multi-turn", "memory", "order-selection"]
+  },
+  {
+    "id": "privacy-policy-001",
+    "cluster_id": "privacy-policy",
+    "split": "DEVELOPMENT",
+    "category": "PRIVACY",
+    "customer_id": "customer_002",
+    "conversation_id": "conv_history_002",
+    "turns": [{"message": "Omni lưu thông tin cá nhân của tôi như thế nào?"}],
+    "expected": {
+      "intents": ["PRIVACY"],
+      "required_tools": ["search_knowledge"],
+      "allowed_tools": ["search_knowledge"],
+      "required_citation_terms": ["dữ liệu", "privacy", "bảo mật"],
+      "model_profile": "reasoning",
+      "max_tool_calls": 2
+    },
+    "tags": ["policy", "citation", "terra"]
+  }
+]

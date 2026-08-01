@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-07-31T05:57:12.713Z",
+  "marker": "CUA-E2E-MEMORY-20260731",
+  "passed": 5,
+  "failed": 0,
+  "results": [
+    {
+      "id": "MEMORY-01-INITIAL",
+      "status": "PASS",
+      "actual": "Đơn ORD-1181 chưa giao xong và hiện đang chờ xác nhận. Giao Hàng Nhanh đang phụ trách đơn, dự kiến giao trước 11:16 ngày 31/07/2026."
+    },
+    {
+      "id": "MEMORY-02-FOLLOW-UP",
+      "status": "PASS",
+      "actual": "Khoản thanh toán 15.835.000₫ của đơn ORD-1181 đã được ngân hàng xác nhận."
+    },
+    {
+      "id": "MEMORY-03-EXPLICIT-OVERRIDE",
+      "status": "PASS",
+      "actual": "Đơn ORD-8743D67CB8 chưa giao xong và hiện đang được xử lý. đơn vị vận chuyển đang phụ trách đơn."
+    },
+    {
+      "id": "MEMORY-04-UPDATED-CONTEXT",
+      "status": "PASS",
+      "actual": "Khoản thanh toán 408.000₫ của đơn ORD-8743D67CB8 đang chờ thanh toán."
+    },
+    {
+      "id": "MEMORY-05-RELOAD",
+      "status": "PASS",
+      "actual": "Đơn ORD-8743D67CB8 đã hủy, nên giờ không thể hủy trực tiếp nữa. Nếu bạn không muốn nhận hàng, mình có thể hướng dẫn phương án phù hợp với trạng thái hiện tại."
+    }
+  ]
+}

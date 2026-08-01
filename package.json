@@ -1,0 +1,18 @@
+{
+  "name": "chatagent",
+  "version": "1.0.0",
+  "description": "MVP hỗ trợ khách hàng có căn cứ: customer/order/payment/shipment tools, Knowledge Platform, LangGraph workflow, citation và safe handoff.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "cd apps/ai-service && py -3.13 -m unittest discover -s tests -p test_*.py",
+    "eval:audit": "node datasets/audit-evaluations.mjs",
+    "eval:live": "cd apps/ai-service && py -3.13 -m app.evaluation_v2_runner --dataset ../../datasets/evaluation-v2.sample.json --output ../../datasets/artifacts/evaluation-v2-report.json",
+    "eval:kb-lifecycle": "pnpm --dir apps/web kb:test-lifecycle"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

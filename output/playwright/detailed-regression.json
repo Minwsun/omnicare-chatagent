@@ -1,0 +1,133 @@
+{
+  "generatedAt": "2026-07-31T05:57:44.227Z",
+  "marker": "CUA-E2E-DETAIL-20260731",
+  "passed": 19,
+  "failed": 0,
+  "total": 19,
+  "results": [
+    {
+      "id": "AUTH-01-INVALID",
+      "status": "PASS",
+      "actual": "Email hoặc mật khẩu không đúng."
+    },
+    {
+      "id": "AUTH-02-ADMIN",
+      "status": "PASS",
+      "actual": "http://localhost:3000/admin"
+    },
+    {
+      "id": "ADMIN-01-DASHBOARD",
+      "status": "PASS",
+      "actual": "OmniCare\nADMIN PORTAL\nDashboard\nInbox\nKnowledge\nGraphRAG\nAI Runs\nadmin@test.com\nĐăng xuất\n\nADMIN CONTROL ROOM\n\nVận hành hỗ trợ\n30\nTickets mở\n1324\nDocuments\n701\nGraph builds\n5\nAI runs"
+    },
+    {
+      "id": "ADMIN-02-KNOWLEDGE",
+      "status": "PASS",
+      "actual": "OmniCare\nADMIN PORTAL\nDashboard\nInbox\nKnowledge\nGraphRAG\nAI Runs\nadmin@test.com\nĐăng xuất\n\nKNOWLEDGE MANAGEMENT\n\nTài liệu\n\nAUTO KNOWLEDGE INGESTION\n\nNạp văn bản vào KB + GraphRAG\nTiêu đềNội dungPhân tích và publish\n[Nguồn TIKTOK_SHOP] Trả hàng và hoàn tiền\nPOLICY\n\nHọc viện › Policy Center › Seller › Dịch vụ Sau bán hàng Trả hàng và hoàn tiền 09/07/2026 Áp dụng cho:Việt Nam Chính sách hoàn trả và hoàn tiền Bài viết này trình bày Chính sách trả hàng và hoàn tiền trên TikTok Shop. Hãy nhấp vào các liên kết sau đây để đi đến những phần có liên quan: Mốc thời gian và quy trình\n\nCUSTOMER_AUTHENTICATED · authority 100 · refund\n[Nguồn TIKTOK_SHOP] Trả hàng từ người bán đến khách hàng\nPOLICY\n\nHọc việ"
+    },
+    {
+      "id": "GRAPH-01-PUBLISHED",
+      "status": "PASS",
+      "actual": {
+        "graphNodes": 3,
+        "graphEdges": 2,
+        "graphStatus": "Published Graph · chỉ đọc"
+      }
+    },
+    {
+      "id": "GRAPH-02-READONLY",
+      "status": "PASS",
+      "actual": "Publish disabled in published preview"
+    },
+    {
+      "id": "AUTH-03-USER",
+      "status": "PASS",
+      "actual": "http://localhost:3000/portal"
+    },
+    {
+      "id": "ORDER-01-LIST",
+      "status": "PASS",
+      "actual": {
+        "orderCount": 151
+      }
+    },
+    {
+      "id": "ORDER-02-DETAIL",
+      "status": "PASS",
+      "actual": {
+        "orderId": "ORD-1181"
+      }
+    },
+    {
+      "id": "CHAT-01-POPUP",
+      "status": "PASS",
+      "actual": "OmniCare AI\nĐang hỗ trợ đơn ORD-1181\n☰×\n\nHỏi về giao hàng, thanh toán, hủy hoặc trả đơn ORD-1181.\n\nTheo dõi đơn\nKiểm tra hủy đơn\nKiểm tra trả hàng\nGửi"
+    },
+    {
+      "id": "CHAT-02-ORDER-TOOL",
+      "status": "PASS",
+      "actual": "Mình vừa kiểm tra đơn ORD-1181: trạng thái hiện tại là shop đã xác nhận, nên hệ thống vẫn cho phép gửi lệnh hủy. Đơn chưa bị hủy; bạn bấm “Đồng ý hủy” bên dưới nếu muốn thực hiện.\n\nHủy đơn ORD-1181?\n\nĐơn hiện shop đã xác nhận. Hệ thống chỉ hủy sau khi bạn xác nhận.\n\nĐồng ý hủy\nKhông hủy"
+    },
+    {
+      "id": "CHAT-03-CONFIRMATION-UI",
+      "status": "PASS",
+      "actual": {
+        "generatedUi": 1
+      }
+    },
+    {
+      "id": "CHAT-04-HISTORY",
+      "status": "PASS",
+      "actual": "＋ Trò chuyện mới\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-MEMORY-20260731 Xem tình trạng đơn ORD-1181\n10 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-MEMORY-20260731 Xem tình trạng đơn ORD-1181\n10 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-MEMORY-20260731 Xem tình trạng đơn ORD-1181\n10 tin nhắn\nĐơn đó có hủy được không?\n2 tin nhắn\nCUA-E2E-MEMORY-20260731 Xem tình trạng đơn ORD-1181\n8 tin nhắn\nĐơn đó có hủy được không?\n2 tin nhắn\nCUA-E2E-MEMORY-20260731 Xem tình trạng đơn ORD-1181\n8 tin nhắn\ntôi có thể trả hàng không\n18 tin nhắn\ntôi có thể trả hàng không\n14 tin nhắn\nĐiều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nĐiều kiện trả hàng và bằng chứng cần có là gì?\n1 tin nhắn\ntôi có thể hủy đơn hàng không\n6 tin nhắn\ntôi có thể huuyr đơn khoong\n11 tin nhắn\nĐơn ORD-1277 có thể hủy không?\n2 tin nhắn\nĐơn này có thể hủy không?\n1 tin nhắn\nĐơn này đang ở đâu và dự kiến giao khi nào?\n2 tin nhắn\nĐơn này đang ở đâu và dự kiến giao khi nào?\n1 tin nhắn\ntôi có thể trả hàng không\n5 tin nhắn\nDon ORD-1011 h�ng b? l?i c� tr? h�ng du?c kh�ng?\n2 tin nhắn\nDon ORD-1011 h�ng b? l?i c� tr? h�ng du?c kh�ng?\n1 tin nhắn\nDon ORD-1011 h�ng b? l?i c� tr? h�ng du?c kh�ng?\n1 tin nhắn\nDon ORD-1011 h�ng b? l?i c� tr? h�ng du?c kh�ng?\n1 tin nhắn\nDon ORD-1001 c� th? tr? h�ng kh�ng?\n2 tin nhắn\nDon ORD-1011 h�ng b? l?i c� tr? h�ng du?c kh�ng?\n2 tin nhắn\nđơn tôi đến đâu rồi\n6 tin nhắn\nĐơn hàng của tôi đang ở đâu?\n2 tin nhắn\nCuộc trò chuyện mới\n4 tin nhắn\nCuộc trò chuyện mới\n2 tin nhắn"
+    },
+    {
+      "id": "CHAT-05-KB-ANSWER",
+      "status": "PASS",
+      "actual": "Trả hàng được chấp nhận ngay sau khi gửi yêu cầu hoặc chuyển sang trạng thái đang xem xét; bằng chứng cần có tùy trường hợp.\n\n1) Chưa nhận được hàng: không cần cung cấp bằng chứng.\n\n2) Đã nhận hàng nhưng có vấn đề như bể vỡ, sai mẫu, hàng lỗi, khác mô tả: nên chuẩn bị video mở kiện hàng. Video nên thấy rõ 6 mặt kiện hàng, mã vận đơn trên kiện phải khớp đơn hàng.\n\n3) Nếu được yêu cầu bổ sung thêm bằng chứng: hãy gửi đúng hạn theo thông báo trên ứng dụng. Nếu nộp trễ, Omni sẽ xử lý trên phần bằng chứng đã nhận trước đó.\n\n4) Khi cần gửi trả sản phẩm: nên quay video lúc đóng kiện hàng hoàn trả.\n\nPhần chưa có trong tài liệu này: điều kiện chi tiết để được chấp nhận trả hàng cho từng loại đơn và thời hạn cụ thể của từng trường hợp. Nếu bạn muốn, mình có thể tóm tiếp phần quy trình sau khi yêu cầu được chấp nhận.\n\nNguồn: [Nguồn OMNI] [Trả hàng/ Hoàn tiền] Quy trình Omni xử lý yêu cầu Trả hàng/ Hoàn tiền\nNguồn: [Nguồn OMNI] [Trả hàng/Hoàn tiền] Hướng dẫn chuẩn bị bằng chứng khi yêu cầu Trả hàng/ Hoàn tiền\nNguồn: [Nguồn OMNI] CHÍNH SÁCH TRẢ HÀNG VÀ HOÀN TIỀN\nNguồn: [Nguồn OMNI] CHÍNH SÁCH TRẢ HÀNG VÀ HOÀN TIỀN (bản trước đây)"
+    },
+    {
+      "id": "CHAT-06-CITATIONS",
+      "status": "PASS",
+      "actual": {
+        "citations": 4,
+        "returnCitations": [
+          "Nguồn: [Nguồn OMNI] [Trả hàng/ Hoàn tiền] Quy trình Omni xử lý yêu cầu Trả hàng/ Hoàn tiền",
+          "Nguồn: [Nguồn OMNI] [Trả hàng/Hoàn tiền] Hướng dẫn chuẩn bị bằng chứng khi yêu cầu Trả hàng/ Hoàn tiền",
+          "Nguồn: [Nguồn OMNI] CHÍNH SÁCH TRẢ HÀNG VÀ HOÀN TIỀN",
+          "Nguồn: [Nguồn OMNI] CHÍNH SÁCH TRẢ HÀNG VÀ HOÀN TIỀN (bản trước đây)"
+        ]
+      }
+    },
+    {
+      "id": "CHAT-07-CITATION-RELEVANCE",
+      "status": "PASS",
+      "actual": [
+        "Nguồn: [Nguồn OMNI] [Trả hàng/ Hoàn tiền] Quy trình Omni xử lý yêu cầu Trả hàng/ Hoàn tiền",
+        "Nguồn: [Nguồn OMNI] [Trả hàng/Hoàn tiền] Hướng dẫn chuẩn bị bằng chứng khi yêu cầu Trả hàng/ Hoàn tiền",
+        "Nguồn: [Nguồn OMNI] CHÍNH SÁCH TRẢ HÀNG VÀ HOÀN TIỀN",
+        "Nguồn: [Nguồn OMNI] CHÍNH SÁCH TRẢ HÀNG VÀ HOÀN TIỀN (bản trước đây)"
+      ]
+    },
+    {
+      "id": "CHAT-08-PERSISTENCE",
+      "status": "PASS",
+      "actual": "＋ Trò chuyện mới\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-MEMORY-20260731 Xem tình trạng đơn ORD-1181\n10 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-MEMORY-20260731 Xem tình trạng đơn ORD-1181\n10 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hàng và bằng chứng cần có là gì?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Đơn này có thể hủy không?\n2 tin nhắn\nCUA-E2E-DETAIL-20260731 Điều kiện trả hà"
+    },
+    {
+      "id": "MOBILE-01-CHAT",
+      "status": "PASS",
+      "actual": {
+        "x": 10,
+        "y": 10,
+        "width": 370,
+        "height": 752
+      }
+    },
+    {
+      "id": "BROWSER-01-NO-ERRORS",
+      "status": "PASS",
+      "actual": []
+    }
+  ],
+  "browserErrors": []
+}

@@ -1,0 +1,51 @@
+{
+  "generatedAt": "2026-07-31T03:30:33.457Z",
+  "results": [
+    {
+      "id": "AUTH-INVALID",
+      "status": "PASS",
+      "actual": "OMNICARE ACCESS\n\nĐăng nhập\nEmail\nMật khẩu\n\nEmail hoặc mật khẩu không đúng.\n\nĐăng nhập\nChat",
+      "screenshot": "E:\\Code _Project\\ChatAgent\\output\\playwright\\auth-invalid.png"
+    },
+    {
+      "id": "AUTH-ADMIN",
+      "status": "PASS",
+      "actual": "http://localhost:3000/admin",
+      "screenshot": null
+    },
+    {
+      "id": "ADMIN-GRAPH-CONTROLS",
+      "status": "FAIL",
+      "actual": "OmniCare\nADMIN PORTAL\nDashboard\nInbox\nKnowledge\nGraphRAG\nAI Runs\nadmin@test.com\nĐăng xuất\n\nPOSTGRESQL GRAPHRAG\n\nKnowledge Graph Studio\nRebuild toàn bộ GraphRAG\n1404\nEntities\n704\nEdges\n413\nClaims\nDRAFT\nEdit mode\n+ Node gốc\n+ Node con\nXếp dạng cây\nCard view\nLưu draft\nValidate\nPublish\nWorkspace DRAFT\nCây tri thức\nTìm node\nLoại node\nTất cả\nDOCUMENT\nFAQ\nPOLICY\nTERMS\nRULE\nINTENT\nACTION\nPRODUCT_SCOPE\nORDER_STATUS\nPAYMENT_STATUS\nINCIDENT\nESCALATION\nQuan hệ mới\nANSWERS\nGOVERNED_BY\nREQUIRES\nALLOWS\nPROHIBITS\nAPPLIES_TO\nESCALATES_TO\nAFFECTED_BY\nSUPERSEDES\nRELATED_TO\nBảng màu node\n\nChọn node rồi thêm node con. Kéo đường nối để tạo quan hệ. Double-click để sửa văn bản.\n\nReact Flow",
+      "screenshot": "E:\\Code _Project\\ChatAgent\\output\\playwright\\admin-graph.png"
+    },
+    {
+      "id": "ADMIN-GRAPH-NODES",
+      "status": "FAIL",
+      "actual": "knowledge-node=0",
+      "screenshot": null
+    }
+  ],
+  "errors": [
+    {
+      "page": "http://localhost:3000/login",
+      "type": "console",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "page": "http://localhost:3000/login",
+      "type": "console",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "page": "http://localhost:3000/login",
+      "type": "console",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "page": "http://localhost:3000/admin/graph",
+      "type": "suite",
+      "text": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.graph-toolbar button').first()\u001b[22m\n\u001b[2m    - locator resolved to <button>…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    58 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not visible\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\n    at C:\\Users\\minwsun\\AppData\\Local\\Temp\\chatagent-playwright\\run-ui.mjs:42:55"
+    }
+  ]
+}

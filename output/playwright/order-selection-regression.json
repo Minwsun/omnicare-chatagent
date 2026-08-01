@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-07-31T04:26:03.156Z",
+  "marker": "CUA-E2E-ORDER-SELECT-20260731",
+  "passed": 6,
+  "failed": 0,
+  "results": [
+    {
+      "id": "ORDER-SELECTOR-RENDER",
+      "status": "PASS",
+      "actual": {
+        "optionCount": 5,
+        "firstOrder": "ORD-8743D67CB8"
+      }
+    },
+    {
+      "id": "ORDER-SELECTOR-ENABLED",
+      "status": "PASS",
+      "actual": "ORD-8743D67CB8\nshop đã xác nhận · 408.000₫"
+    },
+    {
+      "id": "ORDER-SELECTOR-CONTINUE",
+      "status": "PASS",
+      "actual": "Đơn ORD-8743D67CB8 chưa giao xong và hiện đang được xử lý. đơn vị vận chuyển đang phụ trách đơn."
+    },
+    {
+      "id": "ORDER-SELECTOR-NO-ERROR",
+      "status": "PASS",
+      "actual": "Đơn ORD-8743D67CB8 chưa giao xong và hiện đang được xử lý. đơn vị vận chuyển đang phụ trách đơn."
+    },
+    {
+      "id": "BRAND-OMNI",
+      "status": "PASS",
+      "actual": "OmniVIP mình chưa kiểm tra được thông tin này trong tài liệu đang có.\n\nĐiều kiện trả hàng: nếu hàng khác mô tả, hư hỏng, bạn có thể từ chối nhận khi đồng kiểm; nếu đã nhận hàng, vẫn có thể gửi yêu cầu trả hàng/hoàn tiền trong 15 ngày từ lúc đơn được cập nhật “Giao hàng thành công”.\n\nRiêng hàng tươi sống và đông lạnh, thời hạn tối đa là 24 giờ từ lúc đơn được cập nhật “Giao hàng thành công”, trừ lý do chưa nhận được hàng.\n\nYêu cầu thường được phản hồi trong 3–5 ngày làm việc. Nếu bạn muốn, mình có thể tóm tiếp phần trường hợp được xem xét riêng cho sản phẩm hạn chế trả hàng.\n\nNguồn: [Nguồn OMNI] [Trả hàng/Hoàn tiền] Cẩm nang Trả hàng hoàn tiền\nNguồn: [Nguồn OMNI] [Đơn hàng] Tôi có thể yêu cầu đổi sản phẩm khác không khi đã nhận hàng?\nNguồn: [Nguồn OMNI] [Trả hàng/Hoàn tiền] Những quy định chung về Trả hàng/Hoàn tiền của Omni\nNguồn: [Nguồn OMNI] ĐIỀU KHOẢN VÀ ĐIỀU KIỆN GÓI DỊCH VỤ SPECIAL OmniPayLater"
+    },
+    {
+      "id": "CANCEL-SELECTOR-CONTINUE",
+      "status": "PASS",
+      "actual": "Mình vừa kiểm tra đơn ORD-8743D67CB8: trạng thái hiện tại là shop đã xác nhận, nên hệ thống vẫn cho phép gửi lệnh hủy. Đơn chưa bị hủy; bạn bấm “Đồng ý hủy” bên dưới nếu muốn thực hiện.\n\nHủy đơn ORD-8743D67CB8?\n\nĐơn hiện shop đã xác nhận. Hệ thống chỉ hủy sau khi bạn xác nhận.\n\nĐồng ý hủy\nKhông hủy"
+    }
+  ]
+}

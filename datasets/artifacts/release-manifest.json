@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-07-30",
+  "developmentBaseline": {
+    "hybridPassed": 269,
+    "cases": 300,
+    "passRate": 0.8967
+  },
+  "ontologyCanary": {
+    "seedHash": "11455e4855de",
+    "structuralPassed": 300,
+    "hybridPassed": 282,
+    "cases": 300,
+    "hybridPassRate": 0.94
+  },
+  "marketplaceRegression": {
+    "passed": 200,
+    "cases": 200,
+    "citationFailures": 0,
+    "unsafeAutonomousActions": 0
+  },
+  "policy": "Raw evaluation reports are generated artifacts and are not committed. Regenerate them with the evaluation runner."
+}

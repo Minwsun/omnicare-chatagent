@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "citations": 4,
+  "answer": "Có thể trả hàng nếu hàng nhận được bị lỗi như khác mô tả, hư hỏng, hoặc vấn đề tương tự. Nếu đơn có đồng kiểm, bạn có thể từ chối nhận ngay lúc nhận hàng; nếu đã nhận rồi, vẫn có thể gửi yêu cầu trong thời hạn cho phép.\n\nPhần bằng chứng cần có, mình chưa kiểm tra được chi tiết cụ thể trong phần tài liệu này. Bạn muốn mình tóm tiếp mục “người mua cần cung cấp những bằng chứng gì” không?\n\nNguồn: [Nguồn SHOPEE] [Trả hàng/Hoàn tiền] Cẩm nang Trả hàng hoàn tiền\nNguồn: [Nguồn SHOPEE] [Đơn hàng] Tôi có thể yêu cầu đổi sản phẩm khác không khi đã nhận hàng?\nNguồn: [Nguồn SHOPEE] [Trả hàng/Hoàn tiền] Những quy định chung về Trả hàng/Hoàn tiền của Shopee\nNguồn: [Nguồn SHOPEE] [Trả góp] Tại sao Ngân hàng vẫn yêu cầu tôi thanh toán tổng giá trị đơn hàng mặc dù tôi đã đăng ký Trả góp bằng Thẻ tín dụng?",
+  "errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ]
+}
