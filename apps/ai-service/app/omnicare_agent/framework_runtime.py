@@ -114,7 +114,7 @@ class LangChainAgentRuntime:
     def __init__(self, registry: ToolRegistry, checkpointer=None) -> None:
         self.registry = registry
         self.read_tools = registry.read_tools()
-        self.supervisor = SupervisorHarness(classify, normalize_support_text, normalize_order_id, checkpointer)
+        self.supervisor = SupervisorHarness(classify, normalize_support_text, normalize_order_id)
         fast_model = configured_model("fast")
         self.agent = create_agent(
             model=fast_model,
