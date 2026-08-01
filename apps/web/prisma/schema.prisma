@@ -346,6 +346,7 @@ model Order {
   commerceActions CommerceAction[]
 
   @@index([customerId, placedAt])
+  @@index([customerId, status, placedAt])
 }
 
 model CommerceAction {
@@ -398,6 +399,8 @@ model Shipment {
   observedAt        DateTime
   order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   events            ShipmentEvent[]
+
+  @@index([orderId, observedAt])
 }
 
 model ShipmentEvent {
@@ -583,6 +586,8 @@ model Ticket {
   order          Order?        @relation(fields: [orderId], references: [id])
   conversation   Conversation  @relation(fields: [conversationId], references: [id])
   events         TicketEvent[]
+
+  @@index([customerId, status, updatedAt])
 }
 
 model TicketEvent {
@@ -1075,6 +1080,8 @@ model AiRun {
   steps          AiStep[]
   toolCalls      AiToolCall[]
   retrievals     AiRetrievalResult[]
+
+  @@index([conversationId, startedAt])
 }
 
 model AiStep {
@@ -1085,6 +1092,8 @@ model AiStep {
   latencyMs Int
   summary   Json?
   run       AiRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
 }
 
 model AiToolCall {
@@ -1098,6 +1107,8 @@ model AiToolCall {
   latencyMs      Int
   createdAt      DateTime       @default(now())
   run            AiRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
 }
 
 model AiRetrievalResult {
@@ -1110,6 +1121,8 @@ model AiRetrievalResult {
   run       AiRun            @relation(fields: [runId], references: [id], onDelete: Cascade)
   version   KnowledgeVersion @relation(fields: [versionId], references: [id])
   chunk     KnowledgeChunk   @relation(fields: [chunkId], references: [id])
+
+  @@index([runId])
 }
 
 model AuditLog {

@@ -15,7 +15,7 @@ class Repository:
 
     async def connect(self) -> None:
         if self.pool is None:
-            self.pool = await asyncpg.create_pool(settings.database_url, min_size=2, max_size=20)
+            self.pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=5)
 
     async def close(self) -> None:
         if self.pool is not None:
@@ -511,6 +511,49 @@ class Repository:
     async def finish_ai_run(self, run_id: str, intent: Optional[str], confidence: float, requires_human: bool) -> None:
         await self.connect()
         await self.pool.execute('UPDATE "AiRun" SET intent=$2,confidence=$3,"requiresHuman"=$4,"completedAt"=now() WHERE id=$1', run_id, intent, confidence, requires_human)
+
+    async def persist_ai_trace(
+        self,
+        run_id: str,
+        conversation_id: str,
+        prompt_version: str,
+        intent: Optional[str],
+        confidence: float,
+        requires_human: bool,
+        steps: List[Dict[str, Any]],
+        tool_calls: List[Dict[str, Any]],
+        retrievals: List[Dict[str, Any]],
+    ) -> None:
+        await self.connect()
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    'INSERT INTO "AiRun" (id,"conversationId","promptVersion",intent,confidence,"requiresHuman","startedAt","completedAt") VALUES ($1,$2,$3,$4,$5,$6,now(),now())',
+                    run_id, conversation_id, prompt_version, intent, confidence, requires_human,
+                )
+                if steps:
+                    await connection.executemany(
+                        'INSERT INTO "AiStep" (id,"runId",name,status,"latencyMs",summary) VALUES ($1,$2,$3,$4,$5,$6::jsonb)',
+                        [(f"aistep_{uuid4().hex}", run_id, item["name"], item.get("status", "COMPLETED"), int(item.get("latency_ms", 0)), json.dumps(item.get("summary") or {}, default=str)) for item in steps],
+                    )
+                if tool_calls:
+                    await connection.executemany(
+                        '''INSERT INTO "AiToolCall" (id,"runId","toolName",status,"referenceId","inputRedacted","outputRedacted","latencyMs","createdAt")
+                           VALUES ($1,$2,$3,$4::"ToolCallStatus",$5,'{}'::jsonb,jsonb_build_object('status',$4::text),$6,now())''',
+                        [(f"aitool_{uuid4().hex}", run_id, item["name"], item["status"], item.get("reference_id"), int(item.get("latency_ms", 0))) for item in tool_calls],
+                    )
+                for rank, item in enumerate(retrievals, 1):
+                    row = await connection.fetchrow(
+                        '''SELECT v.id AS version_id, c.id AS chunk_id FROM "KnowledgeVersion" v
+                           JOIN "KnowledgeChunk" c ON c."versionId"=v.id AND c."retrievalEnabled"=true
+                           WHERE v."documentId"=$1 AND v."semanticVersion"=$2 ORDER BY c.id LIMIT 1''',
+                        item["document_id"], item["version"],
+                    )
+                    if row:
+                        await connection.execute(
+                            'INSERT INTO "AiRetrievalResult" (id,"runId","versionId","chunkId",score,rank) VALUES ($1,$2,$3,$4,$5,$6)',
+                            f"airet_{uuid4().hex}", run_id, row["version_id"], row["chunk_id"], float(item.get("score") or 0), rank,
+                        )
 
 
 repository = Repository()

@@ -2,10 +2,12 @@ import json
 import logging
 import re
 import time
+import asyncio
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +29,20 @@ from .tools import cancel_order, confirm_checkout, create_checkout_session, get_
 from .graphrag_worker import GraphRagWorker
 
 logger = logging.getLogger(__name__)
+background_tasks: set[asyncio.Task] = set()
+
+
+def schedule_background(coro) -> None:
+    task = asyncio.create_task(coro)
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
+
+
+async def persist_trace_safely(**payload) -> None:
+    try:
+        await repository.persist_ai_trace(**payload)
+    except Exception:
+        logger.exception("AI trace batch persist failed")
 
 
 class VisionImage(BaseModel):
@@ -181,12 +197,8 @@ async def agent_stream(message: IncomingMessage) -> StreamingResponse:
     async def events():
         started_at = time.perf_counter()
         last_step_at = started_at
-        run_id = None
-        if settings.harness_v3_enabled:
-            try:
-                run_id = await repository.start_ai_run(message.conversation_id, f"{settings.prompt_version}:{settings.harness_version}")
-            except Exception:
-                logger.exception("AI trace start failed")
+        run_id = f"airun_{uuid4().hex}" if settings.harness_v3_enabled else None
+        trace_steps = []
         yield f"event: accepted\ndata: {json.dumps({'messageId': message.message_id, 'runId': run_id})}\n\n"
         yield progress_event("UNDERSTANDING", "Đang tìm hiểu yêu cầu của bạn…")
         try:
@@ -206,10 +218,7 @@ async def agent_stream(message: IncomingMessage) -> StreamingResponse:
                 if event_type in {"understanding", "planning", "context_loaded", "model_selected", "model_escalated", "specialist_selected", "tool_policy", "tool_started", "tool_completed", "retrieving", "retrieval_completed", "reviewing", "validation"}:
                     now = time.perf_counter()
                     if run_id:
-                        try:
-                            await repository.record_ai_step(run_id, event_type, "COMPLETED", round((now - last_step_at) * 1000), payload if isinstance(payload, dict) else {"value": str(payload)[:500]})
-                        except Exception:
-                            logger.exception("AI trace step failed")
+                        trace_steps.append({"name": event_type, "status": "COMPLETED", "latency_ms": round((now - last_step_at) * 1000), "summary": payload if isinstance(payload, dict) else {"value": str(payload)[:500]}})
                     last_step_at = now
                     yield f"event: {event_type}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
                     continue
@@ -225,15 +234,6 @@ async def agent_stream(message: IncomingMessage) -> StreamingResponse:
                     continue
                 response = payload
                 response.run_id = run_id
-                if run_id:
-                    try:
-                        for tool_call in response.tool_calls:
-                            await repository.record_ai_tool_call(run_id, tool_call.name, tool_call.status.value, tool_call.reference_id)
-                        for rank, citation in enumerate(response.citations, 1):
-                            await repository.record_ai_retrieval(run_id, citation.document_id, citation.version, citation.score or 0, rank)
-                        await repository.finish_ai_run(run_id, response.intent, response.confidence, response.requires_human)
-                    except Exception:
-                        logger.exception("AI trace completion failed")
                 if response.resolved_context:
                     yield f"event: context_resolved\ndata: {json.dumps(response.resolved_context, ensure_ascii=False)}\n\n"
                 if response.order_choices:
@@ -244,6 +244,18 @@ async def agent_stream(message: IncomingMessage) -> StreamingResponse:
                     yield f"event: clarification_ready\ndata: {response.clarification.model_dump_json()}\n\n"
                 yield f"event: metrics\ndata: {json.dumps({'ttftMs': first_token_ms, 'totalMs': round((time.perf_counter() - started_at) * 1000)}, ensure_ascii=False)}\n\n"
                 yield f"event: done\ndata: {response.model_dump_json()}\n\n"
+                if run_id:
+                    schedule_background(persist_trace_safely(
+                        run_id=run_id,
+                        conversation_id=message.conversation_id,
+                        prompt_version=f"{settings.prompt_version}:{settings.harness_version}",
+                        intent=response.intent,
+                        confidence=response.confidence,
+                        requires_human=response.requires_human,
+                        steps=trace_steps,
+                        tool_calls=[{"name": call.name, "status": call.status.value, "reference_id": call.reference_id} for call in response.tool_calls],
+                        retrievals=[{"document_id": citation.document_id, "version": citation.version, "score": citation.score or 0} for citation in response.citations],
+                    ))
         except LLMUnavailableError:
             yield progress_event("FAILED", "Chưa thể hoàn tất yêu cầu.", "FAILED")
             yield f"event: error\ndata: {json.dumps({'code': 'LLM_PROVIDER_UNAVAILABLE', 'handoff': True})}\n\n"
