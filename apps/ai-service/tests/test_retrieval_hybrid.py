@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 from app.contracts import RetrievalRequest
-from app.retrieval import retrieve
+from app.retrieval import clear_retrieval_cache, retrieve
 
 
 class FakeHybridStore:
@@ -31,6 +31,9 @@ class FakeHybridStore:
 
 
 class HybridRetrievalTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        await clear_retrieval_cache()
+
     async def test_rrf_merges_channels_and_preserves_parent_summary(self):
         with patch("app.retrieval.embed_texts", return_value=[[0.0] * 1536]):
             results = await retrieve(RetrievalRequest(query="điều kiện trả hàng", profile="RETURN_POLICY"), FakeHybridStore())
@@ -50,6 +53,27 @@ class HybridRetrievalTests(unittest.IsolatedAsyncioTestCase):
         results = await retrieve(RetrievalRequest(query="điều kiện trả hàng", profile="RETURN_POLICY"), store)
         self.assertTrue(results)
         self.assertTrue(all("trả hàng" in result.title.casefold() for result in results))
+
+
+    async def test_reuses_ranked_results_without_requerying_store(self):
+        store = FakeHybridStore()
+        calls = 0
+
+        async def text_search(query, locale, limit, visibility):
+            nonlocal calls
+            calls += 1
+            return [dict(store.row)]
+
+        store.search_knowledge = text_search
+        request = RetrievalRequest(query="return policy evidence", profile="RETURN_POLICY")
+        first = await retrieve(request, store)
+        calls_after_first = calls
+        second = await retrieve(request, store)
+
+        self.assertGreater(calls_after_first, 0)
+        self.assertEqual(calls, calls_after_first)
+        self.assertFalse(first[0].score_breakdown["cache_hit"])
+        self.assertTrue(second[0].score_breakdown["cache_hit"])
 
 
 if __name__ == "__main__":

@@ -31,6 +31,8 @@ class Settings:
     lexical_fast_path_score = float(os.getenv("LEXICAL_FAST_PATH_SCORE", "0.05"))
     embedding_cache_ttl_seconds = int(os.getenv("EMBEDDING_CACHE_TTL_SECONDS", "1800"))
     embedding_cache_max_entries = int(os.getenv("EMBEDDING_CACHE_MAX_ENTRIES", "2000"))
+    retrieval_cache_ttl_seconds = int(os.getenv("RETRIEVAL_CACHE_TTL_SECONDS", "300"))
+    retrieval_cache_max_entries = int(os.getenv("RETRIEVAL_CACHE_MAX_ENTRIES", "1000"))
     web_origin = os.getenv("WEB_ORIGIN", "http://localhost:3000")
 
 

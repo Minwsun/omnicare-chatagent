@@ -11,6 +11,7 @@ from uuid import uuid4
 from .config import settings
 from .embeddings import embed_texts, vector_literal
 from .repositories import Repository
+from .retrieval import clear_retrieval_cache
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,7 @@ class GraphRagWorker:
         await self.repository.pool.execute('''UPDATE "KnowledgeIngestionRun" SET status='DONE',stage='DONE',progress=100,
             "documentId"=COALESCE($2,"documentId"),"versionId"=COALESCE($3,"versionId"),result=$4::jsonb,
             "completedAt"=now(),"heartbeatAt"=now(),"updatedAt"=now() WHERE id=$1''', run_id, document_id, version_id, json.dumps(snapshot))
+        await clear_retrieval_cache()
 
     async def _publish_input(self, run_id: str, payload: dict) -> tuple[str, str, dict]:
         title, content = str(payload["title"]).strip(), str(payload["content"]).strip()

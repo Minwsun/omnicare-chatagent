@@ -65,6 +65,10 @@ services:
         value: "0.05"
       - key: EMBEDDING_CACHE_TTL_SECONDS
         value: "1800"
+      - key: RETRIEVAL_CACHE_TTL_SECONDS
+        value: "300"
+      - key: RETRIEVAL_CACHE_MAX_ENTRIES
+        value: "1000"
       - key: ACTION_CONFIRMATION_SECRET
         generateValue: true
       - key: LANGSMITH_TRACING

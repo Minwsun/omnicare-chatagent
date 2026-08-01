@@ -24,7 +24,7 @@ from .omnicare_agent import OmniCareAgentRuntime
 from .omnicare_agent.framework_runtime import LangChainAgentRuntime
 from .omnicare_agent.confirmation import create_confirmation_token, verify_confirmation_token
 from .repositories import repository
-from .retrieval import retrieve
+from .retrieval import clear_retrieval_cache, retrieve
 from .tools import cancel_order, confirm_checkout, create_checkout_session, get_customer_addresses, get_order_details, quote_checkout, update_checkout
 from .graphrag_worker import GraphRagWorker
 
@@ -382,7 +382,9 @@ async def retrieval_search(request: RetrievalRequest) -> list[RetrievalResult]:
 
 @app.post("/retrieval/rebuild-all")
 async def retrieval_rebuild_all() -> dict:
-    return await repository.rebuild_knowledge_graph()
+    result = await repository.rebuild_knowledge_graph()
+    await clear_retrieval_cache()
+    return result
 
 
 @app.post("/evaluation/run")

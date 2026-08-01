@@ -1,5 +1,6 @@
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -50,6 +51,7 @@ def model_profile(profile: ModelProfileName = "fast") -> tuple[str | None, str]:
     return profiles[profile]
 
 
+@lru_cache(maxsize=4)
 def configured_model(profile: ModelProfileName = "fast"):
     model, effort = model_profile(profile)
     if not settings.llm_enabled or not settings.llm_api_key or not model:

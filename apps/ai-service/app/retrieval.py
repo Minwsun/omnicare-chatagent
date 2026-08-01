@@ -1,13 +1,22 @@
 import asyncio
+import hashlib
+import json
 import re
 import unicodedata
 from typing import List
 
 from .brand import omni_brand_text
+from .async_cache import AsyncSingleFlightCache
 from .contracts import QueryPlan, RetrievalRequest, RetrievalResult
 from .config import settings
 from .embeddings import embed_texts, vector_literal
 from .repositories import Repository, repository
+
+
+_retrieval_cache = AsyncSingleFlightCache[List[RetrievalResult]](
+    settings.retrieval_cache_ttl_seconds,
+    settings.retrieval_cache_max_entries,
+)
 
 
 STOPWORDS = {"là", "gì", "của", "tôi", "cho", "về", "cần", "muốn", "xin", "hãy", "được", "không", "cửa", "hàng", "như", "thế", "nào"}
@@ -154,7 +163,29 @@ def build_search_queries(request: RetrievalRequest, plan: QueryPlan, focused: li
     return list(dict.fromkeys([*proposition_queries, *concept_queries, *expansions, *discriminative_terms]))[:3] or [request.query]
 
 
+def _retrieval_cache_key(request: RetrievalRequest, store: Repository) -> str:
+    payload = {
+        **request.model_dump(mode="json"),
+        "generation": _retrieval_cache.generation,
+        "store": "repository" if store is repository else f"custom:{id(store)}",
+    }
+    return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+async def clear_retrieval_cache() -> None:
+    await _retrieval_cache.clear()
+
+
 async def retrieve(request: RetrievalRequest, store: Repository = repository) -> List[RetrievalResult]:
+    key = _retrieval_cache_key(request, store)
+    results, cache_hit = await _retrieval_cache.get_or_compute(key, lambda: _retrieve_uncached(request, store))
+    copies = [item.model_copy(deep=True) for item in results]
+    for item in copies:
+        item.score_breakdown["cache_hit"] = cache_hit
+    return copies
+
+
+async def _retrieve_uncached(request: RetrievalRequest, store: Repository = repository) -> List[RetrievalResult]:
     words = [word for word in re.findall(r"[\wÀ-ỹ]+", request.query.lower(), flags=re.UNICODE) if word not in STOPWORDS]
     focused = [word for word in words if len(word) >= 3]
     profile_terms = PROFILE_TERMS.get(request.profile or "", ())
