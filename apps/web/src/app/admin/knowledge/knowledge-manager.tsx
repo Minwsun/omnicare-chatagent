@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-type DocumentItem = { id:string; type:string; visibility:string; authorityLevel:number; archived:boolean; title:string; summary:string; content:string; priority:string; pipelineStatus:string; pipelineStage:string|null; pipelineProgress:number; latestRunId:string|null };
+type DocumentItem = { id:string; type:string; visibility:string; authorityLevel:number; archived:boolean; title:string; summary:string; priority:string; pipelineStatus:string; pipelineStage:string|null; pipelineProgress:number; latestRunId:string|null };
 const emptyForm = { documentId:"", title:"", content:"", kind:"GUIDE", visibility:"PUBLIC", importance:"MEDIUM", mandatory:false, priority:"NORMAL" };
 
 export default function KnowledgeManager({ initialDocuments }: { initialDocuments: DocumentItem[] }) {
@@ -39,7 +39,7 @@ export default function KnowledgeManager({ initialDocuments }: { initialDocument
   }
 
   function createDocument() { setForm(emptyForm); setStatus(""); setOpen(true); }
-  function editDocument(document: DocumentItem) { setForm({ documentId:document.id, title:document.title, content:document.content, kind:document.type, visibility:document.visibility, importance:document.authorityLevel>=90?"CRITICAL":document.authorityLevel>=70?"HIGH":"MEDIUM", mandatory:["POLICY","TERMS","SOP"].includes(document.type), priority:document.priority }); setStatus(""); setOpen(true); }
+  async function editDocument(document: DocumentItem) { setStatus("Đang tải nội dung…"); const response=await fetch(`/api/admin/kb/documents/${document.id}`,{cache:"no-store"}); const detail=await response.json(); if(!response.ok){setStatus("Không thể tải tài liệu.");return;} setForm({ documentId:document.id, title:detail.title, content:detail.content, kind:document.type, visibility:document.visibility, importance:document.authorityLevel>=90?"CRITICAL":document.authorityLevel>=70?"HIGH":"MEDIUM", mandatory:["POLICY","TERMS","SOP"].includes(document.type), priority:document.priority }); setStatus(""); setOpen(true); }
 
   async function waitRun(runId: string) {
     for (let attempt=0; attempt<180; attempt+=1) {

@@ -18,6 +18,7 @@ const requestSchema = z.object({
 }).refine((value) => value.content.length > 0 || value.attachmentIds.length > 0, { message: "MESSAGE_OR_ATTACHMENT_REQUIRED" });
 
 export async function POST(request: Request) {
+  const startedAt=performance.now();
   const user = await requireCustomer();
   if (!user) return NextResponse.json({ error: "AUTHENTICATION_REQUIRED" }, { status: 401 });
   if (!user.customerId) return NextResponse.json({ error: "CUSTOMER_PROFILE_REQUIRED" }, { status: 403 });
@@ -61,13 +62,14 @@ export async function POST(request: Request) {
   }
   const attachments = attachmentRows.map(({ bytes: _, ...item }) => item);
   const content = payload.content || "Tôi gửi ảnh kiện hàng.";
-  await prisma.$transaction([
-    prisma.message.create({ data: { id: messageId, conversationId, direction: "INBOUND", content, metadata: attachments.length ? { attachments } : undefined } }),
-    prisma.chatAttachment.updateMany({ where: { id: { in: payload.attachmentIds } }, data: { messageId, status: "ATTACHED" } }),
+  const [,pageContext]=await Promise.all([
+    prisma.$transaction([
+      prisma.message.create({ data: { id: messageId, conversationId, direction: "INBOUND", content, metadata: attachments.length ? { attachments } : undefined } }),
+      prisma.chatAttachment.updateMany({ where: { id: { in: payload.attachmentIds } }, data: { messageId, status: "ATTACHED" } }),
+      prisma.conversation.update({ where: { id: conversationId }, data: { title: conversationTitle ?? content.slice(0, 72), lastMessageAt: new Date() } }),
+    ]),
+    loadConversationContext(conversationId, customerId, payload.pageContext ?? {}),
   ]);
-  await prisma.conversation.update({ where: { id: conversationId }, data: { title: conversationTitle ?? content.slice(0, 72), lastMessageAt: new Date() } });
-
-  const pageContext = await loadConversationContext(conversationId, customerId, payload.pageContext ?? {});
 
   const upstream = await fetch(`${serviceUrl}/agent/stream`, {
     method: "POST",
@@ -97,5 +99,5 @@ export async function POST(request: Request) {
       }
     },
   }));
-  return new Response(stream, { headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", "x-conversation-id": conversationId } });
+  return new Response(stream, { headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", "x-conversation-id": conversationId, "server-timing": `preflight;dur=${(performance.now()-startedAt).toFixed(1)}` } });
 }

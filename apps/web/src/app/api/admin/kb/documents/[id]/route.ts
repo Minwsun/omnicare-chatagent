@@ -6,6 +6,15 @@ import { prisma } from "@/lib/prisma";
 
 const schema = z.object({ confirmSlug: z.string().min(1).max(240) });
 
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const admin=await requireAdmin();
+  if(!admin)return NextResponse.json({error:"FORBIDDEN"},{status:403});
+  const {id}=await params;
+  const document=await prisma.knowledgeDocument.findUnique({where:{id},select:{id:true,type:true,visibility:true,authorityLevel:true,currentVersion:{select:{title:true,summary:true,content:true,semanticVersion:true}}}});
+  if(!document?.currentVersion)return NextResponse.json({error:"DOCUMENT_NOT_FOUND"},{status:404});
+  return NextResponse.json({...document,title:document.currentVersion.title,summary:document.currentVersion.summary,content:document.currentVersion.content,version:document.currentVersion.semanticVersion});
+}
+
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
