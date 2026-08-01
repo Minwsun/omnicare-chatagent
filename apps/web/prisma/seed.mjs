@@ -355,6 +355,7 @@ async function main() {
   await seedCommerce();
   await seedReturnRules();
   await seedAccounts();
+  await seedKnowledge();
   await seedSupport();
   await seedSupplementalKnowledge();
   const counts = {
