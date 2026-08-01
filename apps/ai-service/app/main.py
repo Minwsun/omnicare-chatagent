@@ -62,7 +62,11 @@ def vision_list(value) -> list[str]:
 async def lifespan(app: FastAPI):
     async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
         await checkpointer.setup()
-        app.state.agent_runtime = LangChainAgentRuntime.create(checkpointer) if settings.langchain_agent_enabled else OmniCareAgentRuntime.create(checkpointer)
+        try:
+            app.state.agent_runtime = LangChainAgentRuntime.create(checkpointer) if settings.langchain_agent_enabled else OmniCareAgentRuntime.create(checkpointer)
+        except LLMUnavailableError:
+            logger.warning("LLM provider is not configured; agent endpoints will return 503")
+            app.state.agent_runtime = None
         worker = GraphRagWorker(repository)
         if settings.graphrag_worker_enabled:
             await worker.start()
@@ -76,6 +80,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="OmniCare AI Service", version="3.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[settings.web_origin], allow_methods=["*"], allow_headers=["*"])
+
+
+def agent_runtime():
+    runtime = getattr(app.state, "agent_runtime", None)
+    if runtime is None:
+        raise LLMUnavailableError("LLM provider is not configured")
+    return runtime
 
 TOOL_PROGRESS_STAGES = {
     "get_customer_profile": ("RESOLVING_CUSTOMER", "Đang xác minh thông tin tài khoản…"),
@@ -157,7 +168,7 @@ async def vision_analyze(request: VisionAnalyzeRequest) -> list[VisionAnalysis]:
 @app.post("/agent/run", response_model=GroundedAgentResponse)
 async def agent_run(message: IncomingMessage) -> GroundedAgentResponse:
     try:
-        return await app.state.agent_runtime.run(message)
+        return await agent_runtime().run(message)
     except LLMUnavailableError as error:
         raise HTTPException(status_code=503, detail="LLM_PROVIDER_UNAVAILABLE") from error
     except Exception as error:
@@ -180,7 +191,7 @@ async def agent_stream(message: IncomingMessage) -> StreamingResponse:
         yield progress_event("UNDERSTANDING", "Đang tìm hiểu yêu cầu của bạn…")
         try:
             first_token_ms = None
-            async for event_type, payload in app.state.agent_runtime.stream(message):
+            async for event_type, payload in agent_runtime().stream(message):
                 if event_type == "planning":
                     yield progress_event("PLANNING", "Đang chọn cách hỗ trợ phù hợp…")
                 elif event_type == "tool_started":
@@ -333,7 +344,7 @@ async def agent_interaction(request: AgentInteractionRequest) -> GroundedAgentRe
             conversation_id=request.conversation_id,
             page_context={"orderId": order_id, "resumeIntent": resume_intent, "returnReason": value, "clarification": {"field": field, "value": value}},
         )
-        return await app.state.agent_runtime.run(message)
+        return await agent_runtime().run(message)
     if request.action in {"REJECT", "CANCEL"}:
         return GroundedAgentResponse(answer="Được rồi, tôi sẽ không thực hiện thay đổi nào.", confidence=1, conversation_state="COMPLETED")
     if payload.get("action") == "CANCEL_ORDER" and request.action == "CONFIRM":
@@ -349,7 +360,7 @@ async def agent_interaction(request: AgentInteractionRequest) -> GroundedAgentRe
         raise HTTPException(status_code=400, detail="INVALID_INTERACTION_OPTION")
     resume_intent = str(payload.get("resumeIntent") or "ORDER_TRACKING")
     message = IncomingMessage(message_id=f"interaction:{request.interaction_id}", content=str(payload.get("originalMessage") or f"Kiểm tra đơn {order_id}"), customer_id=request.customer_id, actor_role="CUSTOMER", channel="WEB", conversation_id=request.conversation_id, page_context={"orderId": order_id})
-    return await app.state.agent_runtime.resume_order_intent(resume_intent, message, order_id)
+    return await agent_runtime().resume_order_intent(resume_intent, message, order_id)
 
 
 @app.post("/retrieval/search", response_model=list[RetrievalResult])

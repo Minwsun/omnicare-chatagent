@@ -14,9 +14,9 @@ services:
           name: omnicare-postgres
           property: connectionString
       - key: WEB_ORIGIN
-        sync: false
+        value: https://omnicare-chatagent.vercel.app
       - key: LLM_BASE_URL
-        sync: false
+        value: https://r8cp2m4.abc-tunnel.us/v1
       - key: LLM_API_KEY
         sync: false
       - key: LLM_MODEL
