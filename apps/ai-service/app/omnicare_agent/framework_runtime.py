@@ -30,7 +30,8 @@ from ..tool_adapters import bind_tool_context
 from .confirmation import create_confirmation_token
 from .context import TrustedContext
 from .registry import ToolRegistry, tool_registry
-from .runtime import STATUS_LABELS, classify, format_money, normalize_order_id, normalize_support_text
+from .runtime import STATUS_LABELS, classify, format_datetime, format_money, normalize_order_id, normalize_support_text
+from ..tools import find_eligible_orders as find_eligible_orders_impl, get_shipping_status as get_shipping_status_impl
 from .supervisor import SupervisorHarness
 
 
@@ -148,6 +149,8 @@ class LangChainAgentRuntime:
         context = TrustedContext.from_message(message)
         if self._semantic_intent(message) == "PRODUCT_DISCOVERY":
             return await self._run_product_discovery(message, context)
+        if self._semantic_intent(message) == "ORDER_TRACKING":
+            return await self._run_order_tracking_fast(message, context)
         runtime_context = await self._load_runtime_context(message)
         config = {"configurable": {"thread_id": message.conversation_id}}
         with bind_tool_context(context.tool_context()):
@@ -164,6 +167,13 @@ class LangChainAgentRuntime:
             yield "tool_started", {"tools": ["search_products"]}
             response = await self._run_product_discovery(message, context)
             yield "tool_completed", {"tools": ["search_products"]}
+            yield "token", response.answer
+            yield "done", response
+            return
+        if self._semantic_intent(message) == "ORDER_TRACKING":
+            yield "tool_started", {"tools": ["get_shipping_status" if normalize_order_id(message.content, message.page_context) else "find_eligible_orders"]}
+            response = await self._run_order_tracking_fast(message, context)
+            yield "tool_completed", {"tools": [call.name for call in response.tool_calls]}
             yield "token", response.answer
             yield "done", response
             return
@@ -259,6 +269,70 @@ class LangChainAgentRuntime:
             tool_calls=[ToolExecutionSummary(name="search_products", status=result.status)],
             ui=ui,
             conversation_state="AWAITING_INPUT",
+        )
+
+    async def _run_order_tracking_fast(self, message: IncomingMessage, context: TrustedContext) -> GroundedAgentResponse:
+        order_id = normalize_order_id(message.content, message.page_context)
+        if not order_id:
+            result = await find_eligible_orders_impl(context.tool_context(), "IN_TRANSIT")
+            payload = result.model_dump(mode="json")
+            orders = (result.data or {}).get("orders", []) if result.status == ToolStatus.SUCCESS else []
+            if len(orders) == 1:
+                order_id = str(orders[0]["id"])
+            elif len(orders) > 1:
+                ui = self._order_selector(message, [("find_eligible_orders", payload)], "ORDER_TRACKING")
+                return GroundedAgentResponse(
+                    answer="Mình đã tìm thấy các đơn đang được xử lý hoặc vận chuyển. Bạn chọn đúng đơn bên dưới để mình xem vị trí và thời gian giao mới nhất nhé.",
+                    confidence=1,
+                    intent="ORDER_TRACKING",
+                    goal="ORDER_TRACKING",
+                    tool_calls=[ToolExecutionSummary(name="find_eligible_orders", status=result.status)],
+                    ui=ui,
+                    conversation_state="AWAITING_INPUT",
+                    resolution_status="NEEDS_INPUT",
+                )
+            else:
+                return GroundedAgentResponse(
+                    answer=result.safe_message or "Hiện tài khoản chưa có đơn nào đang được xử lý hoặc vận chuyển.",
+                    confidence=1,
+                    intent="ORDER_TRACKING",
+                    goal="ORDER_TRACKING",
+                    tool_calls=[ToolExecutionSummary(name="find_eligible_orders", status=result.status)],
+                )
+        shipping = await get_shipping_status_impl(context.tool_context(), order_id)
+        if shipping.status == ToolStatus.FORBIDDEN:
+            return GroundedAgentResponse(
+                answer=shipping.safe_message or "Mình chưa thể xác minh đơn hàng này trong tài khoản của bạn.",
+                confidence=0.2,
+                intent="ORDER_TRACKING",
+                goal="ORDER_TRACKING",
+                requires_human=True,
+                escalation_reason=shipping.error_code or "ORDER_OWNERSHIP_VERIFICATION_FAILED",
+                tool_calls=[ToolExecutionSummary(name="get_shipping_status", status=shipping.status)],
+            )
+        if shipping.status != ToolStatus.SUCCESS:
+            return GroundedAgentResponse(
+                answer=shipping.safe_message or "Đơn chưa có thông tin vận chuyển mới.",
+                confidence=0.8,
+                intent="ORDER_TRACKING",
+                goal="ORDER_TRACKING",
+                resolved_context={"orderId": order_id},
+                tool_calls=[ToolExecutionSummary(name="get_shipping_status", status=shipping.status)],
+            )
+        data = shipping.data or {}
+        status = STATUS_LABELS.get(str(data.get("status")), str(data.get("status") or "đang được vận chuyển"))
+        eta = format_datetime(data.get("estimatedDelivery"))
+        carrier = str(data.get("carrier") or "đơn vị vận chuyển")
+        answer = f"Đơn {order_id} hiện {status} qua {carrier}."
+        if eta:
+            answer += f" Dự kiến giao trước {eta}."
+        return GroundedAgentResponse(
+            answer=answer,
+            confidence=1,
+            intent="ORDER_TRACKING",
+            goal="ORDER_TRACKING",
+            resolved_context={"orderId": order_id},
+            tool_calls=[ToolExecutionSummary(name="get_shipping_status", status=shipping.status, reference_id=order_id)],
         )
 
     @staticmethod
