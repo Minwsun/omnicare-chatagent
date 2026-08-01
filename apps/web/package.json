@@ -15,6 +15,7 @@
     "kb:test-lifecycle": "node scripts/test-kb-lifecycle.mjs",
     "kb:rename-omni": "node scripts/rename-brand.mjs",
     "kb:deduplicate": "node scripts/deduplicate-knowledge.mjs",
+    "kb:ensure-core": "node scripts/ensure-core-knowledge.mjs",
     "eval:generate-holdout": "node ../../datasets/generate-holdout.mjs",
     "eval:audit": "node ../../datasets/audit-evaluations.mjs"
   },

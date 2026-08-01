@@ -205,7 +205,7 @@ class LangChainAgentRuntime:
         state = await self.agent.aget_state(config)
         response = await self._ensure_grounded_citations(message, self._convert(message, state.values))
         if streamed_answer:
-            response.answer = self._sanitize_language("".join(streamed_answer))
+            response.answer = "".join(streamed_answer)
         elif response.answer:
             yield "token", response.answer
         yield "done", response
@@ -348,11 +348,21 @@ class LangChainAgentRuntime:
         ]
         evidence_citations = self._citations_from_tools(tool_payloads)
         citations = list({(item["document_id"], item["version"]): item for item in [*evidence_citations, *citations]}.values())[:4]
+        resolved_order_id = normalize_order_id(message.content, message.page_context) or self._historical_selected_order(all_messages)
+        if not resolved_order_id:
+            for _, payload in reversed(tool_payloads):
+                if str(payload.get("status")) != "SUCCESS":
+                    continue
+                data = payload.get("data") or {}
+                resolved_order_id = data.get("orderId") or data.get("id")
+                if resolved_order_id:
+                    break
         return GroundedAgentResponse(
             answer=self._sanitize_language(output.answer),
             confidence=output.confidence,
             intent=output.intent,
             goal=output.intent,
+            resolved_context={"orderId": str(resolved_order_id)} if resolved_order_id else {},
             collected_slots=collected_slots,
             missing_slots=missing_slots,
             clarification=clarification,
