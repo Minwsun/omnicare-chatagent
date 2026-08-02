@@ -59,7 +59,7 @@ try {
   record("ADMIN-REPLY-REACHES-CUSTOMER", true, marker);
 
   await admin.getByRole("button", { name: "Đã xử lý" }).click();
-  await customer.waitForTimeout(5000);
+  await customer.locator(".handoff-card").waitFor({ state: "detached", timeout: 20_000 });
   record("RESOLVE-REMOVES-ACTIVE-HANDOFF", await customer.locator(".handoff-card").count() === 0, await customer.locator(".handoff-card").count());
 } catch (error) {
   results.push({ id: "SUITE", status: "FAIL", actual: error instanceof Error ? error.stack : String(error) });
