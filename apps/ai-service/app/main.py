@@ -33,6 +33,16 @@ logger = logging.getLogger(__name__)
 background_tasks: set[asyncio.Task] = set()
 
 
+class AdminAssistRequest(BaseModel):
+    ticket_id: str
+    category: str
+    priority: str
+    summary: str
+    customer: dict | None = None
+    order: dict | None = None
+    conversation: str = ""
+
+
 def schedule_background(coro) -> None:
     task = asyncio.create_task(coro)
     background_tasks.add(task)
@@ -225,6 +235,34 @@ async def vision_analyze(request: VisionAnalyzeRequest) -> list[VisionAnalysis]:
     except Exception as error:
         logger.exception("Vision analysis failed")
         raise HTTPException(status_code=502, detail="VISION_ANALYSIS_FAILED") from error
+
+
+@app.post("/admin/assist")
+async def admin_assist(request: AdminAssistRequest) -> dict:
+    system = (
+        "Bạn là copilot cho nhân viên chăm sóc khách hàng Omni. Chỉ dùng dữ kiện được cung cấp; không tự tạo trạng thái giao dịch. "
+        "Trả JSON gồm summary, missing_information, next_action, reply_options, warnings. "
+        "reply_options có 2-4 câu trả lời tiếng Việt tự nhiên, ngắn, không hứa điều chưa xác minh."
+    )
+    context = request.model_dump_json(exclude_none=True)
+    try:
+        response = await configured_model("fast").ainvoke([SystemMessage(content=system), HumanMessage(content=context)])
+        raw = response.content if isinstance(response.content, str) else json.dumps(response.content, ensure_ascii=False)
+        payload = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
+        if not isinstance(payload, dict):
+            raise ValueError("ADMIN_ASSIST_RESPONSE_INVALID")
+        return {
+            "summary": str(payload.get("summary") or request.summary),
+            "missing_information": [str(item) for item in payload.get("missing_information", [])][:8],
+            "next_action": str(payload.get("next_action") or "Kiểm tra thông tin và phản hồi khách hàng."),
+            "reply_options": [str(item) for item in payload.get("reply_options", [])][:4],
+            "warnings": [str(item) for item in payload.get("warnings", [])][:8],
+        }
+    except LLMUnavailableError as error:
+        raise HTTPException(status_code=503, detail="LLM_PROVIDER_UNAVAILABLE") from error
+    except Exception as error:
+        logger.exception("Admin assist failed")
+        raise HTTPException(status_code=502, detail="ADMIN_ASSIST_FAILED") from error
 
 
 @app.post("/agent/run", response_model=GroundedAgentResponse)
@@ -444,6 +482,12 @@ async def retrieval_rebuild_all() -> dict:
     result = await repository.rebuild_knowledge_graph()
     await clear_retrieval_cache()
     return result
+
+
+@app.post("/retrieval/cache/clear")
+async def retrieval_cache_clear() -> dict:
+    await clear_retrieval_cache()
+    return {"cleared": True}
 
 
 @app.post("/evaluation/run")

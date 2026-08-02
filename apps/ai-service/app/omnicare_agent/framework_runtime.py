@@ -682,14 +682,16 @@ class LangChainAgentRuntime:
         if current not in {"KNOWLEDGE", "SOCIAL"}:
             return current
         inferred = classify(message.content)
-        if inferred == "RETURN_POLICY" and message.customer_id:
-            return "RETURN_ELIGIBILITY"
-        if inferred == "SHIPPING_POLICY" and message.customer_id:
-            return "ORDER_TRACKING"
-        if inferred == "REFUND_POLICY" and message.customer_id:
-            return "REFUND_STATUS"
-        if inferred == "PAYMENT_POLICY" and message.customer_id:
-            return "PAYMENT_STATUS"
+        normalized = normalize_support_text(message.content)
+        personal_policy_routes = {
+            "RETURN_POLICY": ("RETURN_ELIGIBILITY", ("đơn này", "đơn của tôi", "tôi muốn trả", "trả đơn")),
+            "SHIPPING_POLICY": ("ORDER_TRACKING", ("đơn này", "đơn của tôi", "giao chưa", "khi nào tới")),
+            "REFUND_POLICY": ("REFUND_STATUS", ("đơn này", "đơn của tôi", "tiền về chưa", "hoàn cho đơn")),
+            "PAYMENT_POLICY": ("PAYMENT_STATUS", ("đơn này", "đơn của tôi", "đã thanh toán", "đã trừ tiền")),
+        }
+        route = personal_policy_routes.get(inferred)
+        if message.customer_id and route and any(term in normalized for term in route[1]):
+            return route[0]
         return inferred if inferred != "KNOWLEDGE" else current
 
     @staticmethod

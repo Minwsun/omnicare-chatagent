@@ -17,6 +17,12 @@ async function retrieve() {
   return response.json();
 }
 
+async function clearCache() {
+  let response = await fetch(`${aiUrl}/retrieval/cache/clear`, { method: "POST" });
+  if (response.status === 404) response = await fetch(`${aiUrl}/retrieval/rebuild-all`, { method: "POST" });
+  if (!response.ok) throw new Error(`Cache clear failed: ${response.status} ${await response.text()}`);
+}
+
 async function askAgent(stage) {
   const response = await fetch(`${aiUrl}/agent/run`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message_id: `kb-${stage}-${suffix}`, content: question, customer_id: "customer_001", channel: "WEB", conversation_id: `kb-lifecycle-${stage}-${suffix}`, actor_role: "CUSTOMER", locale: "vi-VN" }) });
   if (!response.ok) throw new Error(`Agent failed: ${response.status} ${await response.text()}`);
@@ -77,10 +83,13 @@ try {
   await cleanup();
   report.stages.push(snapshot("BEFORE_ADD", await retrieve(), await askAgent("before")));
   await createCanary();
+  await clearCache();
   report.stages.push(snapshot("AFTER_ADD", await retrieve(), await askAgent("added")));
   await archiveCanary();
+  await clearCache();
   report.stages.push(snapshot("AFTER_ARCHIVE", await retrieve(), await askAgent("archived")));
   await restoreCanary();
+  await clearCache();
   report.stages.push(snapshot("AFTER_RESTORE", await retrieve(), await askAgent("restored")));
   report.assertions = {
     retrievalAbsentBefore: !report.stages[0].retrievedCanary,

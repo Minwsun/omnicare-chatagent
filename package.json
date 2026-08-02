@@ -8,11 +8,16 @@
   },
   "scripts": {
     "test": "cd apps/ai-service && py -3.13 -m unittest discover -s tests -p test_*.py",
+    "test:e2e:production": "node tests/e2e/production.mjs",
+    "test:e2e:handoff": "node tests/e2e/handoff.mjs",
     "eval:audit": "node datasets/audit-evaluations.mjs",
     "eval:live": "cd apps/ai-service && py -3.13 -m app.evaluation_v2_runner --dataset ../../datasets/evaluation-v2.sample.json --output ../../datasets/artifacts/evaluation-v2-report.json",
-    "eval:kb-lifecycle": "pnpm --dir apps/web kb:test-lifecycle"
+    "eval:kb-lifecycle": "npm --prefix apps/web run kb:test-lifecycle"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
 }

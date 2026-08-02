@@ -84,6 +84,10 @@ class FrameworkRuntimeTests(unittest.TestCase):
         message = IncomingMessage(message_id="message", content="đơn này có trả hàng được không", customer_id="customer_001", conversation_id="conversation")
         self.assertEqual(LangChainAgentRuntime._reconcile_text_intent(message, "KNOWLEDGE"), "RETURN_ELIGIBILITY")
 
+    def test_keeps_generic_return_question_as_policy(self):
+        message = IncomingMessage(message_id="message", content="Hàng lỗi thì trả sao", customer_id="customer_001", conversation_id="conversation")
+        self.assertEqual(LangChainAgentRuntime._reconcile_text_intent(message, "KNOWLEDGE"), "RETURN_POLICY")
+
     def test_trusted_resume_intent_survives_ambiguous_follow_up(self):
         message = IncomingMessage(
             message_id="message",
