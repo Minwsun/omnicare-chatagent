@@ -211,6 +211,17 @@ class FrameworkRuntimeTests(unittest.TestCase):
         self.assertTrue(response.requires_human)
         self.assertEqual(response.escalation_reason, "ORDER_OWNERSHIP_VERIFICATION_FAILED")
 
+    def test_human_request_intent_always_requires_handoff(self):
+        runtime = object.__new__(LangChainAgentRuntime)
+        message = IncomingMessage(message_id="human", content="cân fgapwj nhân viên", customer_id="customer_001", conversation_id="conversation")
+        response = runtime._convert(message, {
+            "messages": [HumanMessage(content=message.content)],
+            "structured_response": SupportAgentOutput(answer="Đã ghi nhận.", intent="HUMAN_REQUEST", requires_human=False),
+        })
+        self.assertTrue(response.requires_human)
+        self.assertEqual(response.escalation_reason, "CUSTOMER_REQUEST")
+        self.assertEqual(response.resolution_status, "HANDOFF")
+
 
 if __name__ == "__main__":
     unittest.main()

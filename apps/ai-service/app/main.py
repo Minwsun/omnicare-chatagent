@@ -64,7 +64,10 @@ def apply_triage(response: GroundedAgentResponse, triage: TriageResult) -> Groun
     response.priority = triage.priority
     response.priority_reasons = triage.priority_reasons
     response.request_fingerprint = triage.request_fingerprint
-    if triage.requires_human:
+    if response.intent == "HUMAN_REQUEST":
+        response.requires_human = True
+        response.escalation_reason = response.escalation_reason or "CUSTOMER_REQUEST"
+    if triage.requires_human or response.requires_human:
         response.requires_human = True
         response.escalation_reason = response.escalation_reason or triage.escalation_reason
         response.resolution_status = "HANDOFF"

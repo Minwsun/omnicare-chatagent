@@ -524,6 +524,10 @@ class LangChainAgentRuntime:
             output.escalation_reason = "ORDER_OWNERSHIP_VERIFICATION_FAILED"
         output.intent = self._infer_intent(output.intent, tool_payloads, tool_calls)
         output.intent = self._reconcile_text_intent(message, output.intent)
+        if output.intent == "HUMAN_REQUEST":
+            output.requires_human = True
+            output.escalation_reason = output.escalation_reason or "CUSTOMER_REQUEST"
+            output.answer = "Mình đang chuyển toàn bộ cuộc trò chuyện này đến nhân viên chăm sóc khách hàng. Bạn không cần trình bày lại từ đầu."
         self._infer_requested_action(message, output, tool_payloads)
         ui = self._order_selector(message, tool_payloads, output.intent)
         if not ui:

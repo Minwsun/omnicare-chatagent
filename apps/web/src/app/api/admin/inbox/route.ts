@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   const tickets = await prisma.ticket.findMany({
     where: {
       status: status ? status as never : { in: [...activeTicketStatuses] },
+      conversationId: { not: { startsWith: "conv_history_" } },
       ...(priority ? { priority: priority as never } : {}),
       ...(assignment === "mine" ? { assignedTo: admin.id } : assignment === "unassigned" ? { assignedTo: null } : {}),
     },

@@ -104,6 +104,14 @@ export async function POST(request: Request) {
         const raw = block.match(/^data: (.+)$/m)?.[1];
         if (!raw) continue;
         const result = JSON.parse(raw);
+        if (result.intent === "HUMAN_REQUEST") {
+          result.requires_human = true;
+          result.escalation_reason ||= "CUSTOMER_REQUEST";
+        }
+        if (result.requires_human && !await findActiveTicket(conversationId)) {
+          const ticket = await prisma.ticket.create({ data: { id: `TCK-${crypto.randomUUID().slice(0, 12).toUpperCase()}`, customerId, conversationId, status: "NEED_HUMAN", priority: result.priority ?? "MEDIUM", category: result.category ?? result.intent ?? "CUSTOMER_REQUEST", summary: result.escalation_reason === "CUSTOMER_REQUEST" ? "Khách hàng yêu cầu gặp nhân viên" : result.answer.slice(0, 500) } });
+          await addTicketEvent(ticket.id, "AI_HANDOFF_CREATED", { messageId, intent: result.intent, reason: result.escalation_reason, confidence: result.confidence });
+        }
         await prisma.message.create({ data: { id: crypto.randomUUID(), conversationId, direction: "OUTBOUND", content: result.answer, metadata: result } });
         await prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } });
         await persistConversationMemory({ conversationId, customerId, inboundMessageId: messageId, result });

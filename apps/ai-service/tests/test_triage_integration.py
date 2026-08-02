@@ -14,6 +14,13 @@ class TriageIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.priority, "URGENT")
         self.assertEqual(response.resolution_status, "HANDOFF")
 
+    def test_apply_triage_preserves_human_request_handoff(self):
+        triage = triage_request("cân fgapwj nhân viên", "customer_001")
+        response = apply_triage(GroundedAgentResponse(answer="Đã ghi nhận.", confidence=0.96, intent="HUMAN_REQUEST"), triage)
+        self.assertTrue(response.requires_human)
+        self.assertEqual(response.escalation_reason, "CUSTOMER_REQUEST")
+        self.assertEqual(response.case_state, "HANDOFF")
+
     async def test_duplicate_handoff_reuses_ticket(self):
         message = IncomingMessage(message_id="m1", content="Có người lạ vào tài khoản của tôi", customer_id="customer_001", conversation_id="c1")
         triage = triage_request(message.content, message.customer_id)
