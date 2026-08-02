@@ -150,6 +150,7 @@ async def lifespan(app: FastAPI):
             logger.warning("LLM provider is not configured; agent endpoints will return 503")
             app.state.agent_runtime = None
         worker = GraphRagWorker(repository)
+        app.state.graphrag_worker = worker
         if settings.graphrag_worker_enabled:
             await worker.start()
         try:
@@ -211,7 +212,24 @@ async def health() -> dict:
         llm = "ready"
     except LLMUnavailableError:
         llm = "unavailable"
-    return {"status": "ok" if database == "ok" and llm == "ready" else "degraded", "service": "omnicare-ai", "database": database, "llm": llm, "model": settings.llm_model}
+    worker = getattr(app.state, "graphrag_worker", None)
+    worker_status = {"enabled": False, "status": "disabled"}
+    if settings.graphrag_worker_enabled and worker:
+        try:
+            worker_status = await worker.status()
+        except Exception as error:
+            worker_status = {"enabled": True, "status": "degraded", "lastError": str(error)[:500]}
+    healthy = database == "ok" and llm == "ready" and worker_status["status"] in {"ready", "disabled"}
+    return {"status": "ok" if healthy else "degraded", "service": "omnicare-ai", "database": database, "llm": llm, "model": settings.llm_model, "worker": worker_status}
+
+
+@app.post("/retrieval/ingestion/wake")
+async def retrieval_ingestion_wake() -> dict:
+    worker = getattr(app.state, "graphrag_worker", None)
+    if not settings.graphrag_worker_enabled or worker is None:
+        raise HTTPException(status_code=503, detail="INGESTION_WORKER_DISABLED")
+    worker.notify()
+    return {"woken": True}
 
 
 @app.post("/vision/analyze", response_model=list[VisionAnalysis])

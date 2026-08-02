@@ -15,7 +15,7 @@ from .retrieval import clear_retrieval_cache
 
 logger = logging.getLogger(__name__)
 
-STAGES = (("NORMALIZING", 5), ("CHUNKING", 20), ("EMBEDDING", 65), ("INDEXING", 90), ("VALIDATING", 96))
+STAGES = (("NORMALIZING", 5), ("CHUNKING", 15), ("PERSISTING", 25), ("EMBEDDING", 45), ("INDEXING", 80), ("VALIDATING", 95))
 
 
 def normalize(value: str) -> str:
@@ -84,31 +84,99 @@ class GraphRagWorker:
         self.repository = repository
         self.tasks: list[asyncio.Task] = []
         self.stopping = asyncio.Event()
+        self.wakeup = asyncio.Event()
+        self.supervisor: asyncio.Task | None = None
+        self.started_at: datetime | None = None
+        self.last_poll_at: datetime | None = None
+        self.last_claim_at: datetime | None = None
+        self.last_success_at: datetime | None = None
+        self.last_error: str | None = None
 
     async def start(self) -> None:
         await self.repository.connect()
-        await self.repository.pool.execute("UPDATE \"KnowledgeIngestionRun\" SET status='RETRY',stage='QUEUED',\"updatedAt\"=now() WHERE status='RUNNING'")
-        self.tasks = [asyncio.create_task(self._loop(index)) for index in range(max(1, settings.graphrag_worker_concurrency))]
+        await self.repository.pool.execute('''UPDATE "KnowledgeIngestionRun" SET status='RETRY',stage='QUEUED',
+            error='Recovered after stale worker heartbeat',"updatedAt"=now()
+            WHERE status='RUNNING' AND ("heartbeatAt" IS NULL OR "heartbeatAt" < now() - interval '5 minutes')''')
+        self.started_at = datetime.now(timezone.utc)
+        self.tasks = [self._new_task(index) for index in range(max(1, settings.graphrag_worker_concurrency))]
+        self.supervisor = asyncio.create_task(self._supervise(), name="graphrag-supervisor")
 
     async def stop(self) -> None:
         self.stopping.set()
-        for task in self.tasks:
+        self.wakeup.set()
+        all_tasks = [*self.tasks, *([self.supervisor] if self.supervisor else [])]
+        for task in all_tasks:
             task.cancel()
-        for task in self.tasks:
+        for task in all_tasks:
             with suppress(asyncio.CancelledError):
                 await task
 
-    async def _loop(self, worker_index: int) -> None:
+    def notify(self) -> None:
+        self.wakeup.set()
+
+    async def status(self) -> dict:
+        queue = await self.repository.pool.fetchrow('''SELECT count(*)::int AS depth,
+            COALESCE(EXTRACT(EPOCH FROM (now()-min("createdAt"))),0)::int AS oldest
+            FROM "KnowledgeIngestionRun" WHERE status IN ('QUEUED','RETRY') AND attempts < 3''')
+        alive = sum(not task.done() for task in self.tasks)
+        return {
+            "enabled": True,
+            "status": "ready" if alive == len(self.tasks) else "degraded",
+            "configuredConcurrency": len(self.tasks),
+            "aliveTasks": alive,
+            "queueDepth": queue["depth"],
+            "oldestQueuedSeconds": queue["oldest"],
+            "startedAt": self.started_at.isoformat() if self.started_at else None,
+            "lastPollAt": self.last_poll_at.isoformat() if self.last_poll_at else None,
+            "lastClaimAt": self.last_claim_at.isoformat() if self.last_claim_at else None,
+            "lastSuccessAt": self.last_success_at.isoformat() if self.last_success_at else None,
+            "lastError": self.last_error,
+        }
+
+    def _new_task(self, worker_index: int) -> asyncio.Task:
+        return asyncio.create_task(self._loop(worker_index), name=f"graphrag-worker-{worker_index}")
+
+    async def _supervise(self) -> None:
         while not self.stopping.is_set():
-            run = await self._claim()
-            if not run:
-                await asyncio.sleep(settings.graphrag_poll_seconds)
-                continue
+            await asyncio.sleep(1)
+            for index, task in enumerate(self.tasks):
+                if task.done() and not self.stopping.is_set():
+                    error = task.exception() if not task.cancelled() else None
+                    self.last_error = f"worker {index} stopped: {error}" if error else f"worker {index} stopped"
+                    logger.error(self.last_error)
+                    self.tasks[index] = self._new_task(index)
+
+    async def _loop(self, worker_index: int) -> None:
+        failures = 0
+        while not self.stopping.is_set():
+            run = None
             try:
+                self.last_poll_at = datetime.now(timezone.utc)
+                run = await self._claim()
+                failures = 0
+                if not run:
+                    self.wakeup.clear()
+                    try:
+                        await asyncio.wait_for(self.wakeup.wait(), timeout=settings.graphrag_poll_seconds)
+                    except asyncio.TimeoutError:
+                        pass
+                    continue
+                self.last_claim_at = datetime.now(timezone.utc)
                 await self._process(run)
+                self.last_success_at = datetime.now(timezone.utc)
+                self.last_error = None
+            except asyncio.CancelledError:
+                raise
             except Exception as error:
-                logger.exception("GraphRAG run %s failed", run["id"])
-                await self._fail(run, error)
+                failures += 1
+                self.last_error = str(error)[:500]
+                logger.exception("GraphRAG worker %s failed", worker_index)
+                if run:
+                    try:
+                        await self._fail(run, error)
+                    except Exception:
+                        logger.exception("GraphRAG run %s could not be marked failed", run["id"])
+                await asyncio.sleep(min(30, 2 ** min(failures, 5)))
 
     async def _claim(self):
         await self.repository.connect()
@@ -131,15 +199,14 @@ class GraphRagWorker:
                 ''', row["id"])
 
     async def _stage(self, run_id: str, stage: str, progress: int, processed: int = 0, total: int = 0) -> None:
-        await self.repository.pool.execute('''UPDATE "KnowledgeIngestionRun" SET stage=$2,progress=$3,
+        await self.repository.pool.execute('''UPDATE "KnowledgeIngestionRun" SET stage=$2,progress=GREATEST(progress,$3),
             "processedUnits"=$4,"totalUnits"=$5,"heartbeatAt"=now(),"updatedAt"=now() WHERE id=$1''', run_id, stage, progress, processed, total)
 
     async def _process(self, run) -> None:
         raw_payload = run["payload"] or {}
         payload = json.loads(raw_payload) if isinstance(raw_payload, str) else dict(raw_payload)
         run_id = run["id"]
-        for stage, progress in STAGES[:2]:
-            await self._stage(run_id, stage, progress)
+        await self._stage(run_id, "NORMALIZING", 5)
         if payload.get("mode") in {"REBUILD_ALL", "REVISUALIZE"}:
             await self.repository.pool.execute('''UPDATE "KnowledgeIngestionRun" SET status='CANCELLED',stage='CANCELLED',progress=100,
                 error='Graph visualization disabled',"completedAt"=now(),"updatedAt"=now() WHERE id=$1''', run_id)
@@ -153,11 +220,12 @@ class GraphRagWorker:
     async def _publish_input(self, run_id: str, payload: dict) -> tuple[str, str, dict]:
         title, content = str(payload["title"]).strip(), str(payload["content"]).strip()
         chunks = split_sections(title, content)
-        await self._stage(run_id, "CHUNKING", 18, 0, len(chunks))
+        await self._stage(run_id, "CHUNKING", 15, 0, len(chunks))
         category_id, category_name = category_for(title, content)
         document_id = str(payload.get("documentId") or f"kb_{uuid4().hex}")
         version_id = f"kbv_{uuid4().hex}"
         now = datetime.now(timezone.utc)
+        await self._stage(run_id, "PERSISTING", 25, 0, len(chunks))
         async with self.repository.pool.acquire() as connection:
             async with connection.transaction():
                 await connection.execute('INSERT INTO "KnowledgeCategory" (id,slug,name) VALUES ($1,$1,$2) ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name', category_id, category_name)
@@ -194,7 +262,7 @@ class GraphRagWorker:
                     await connection.execute('''INSERT INTO "KnowledgeEdge" (id,"versionId","chunkId","sourceId","targetId",relation,weight,metadata,"createdAt") VALUES ($1,$2,$3,$4,$5,'RELATED_TO',0.8,$6::jsonb,now())''', f"kbedge_{uuid4().hex}", version_id, chunk_id, source, target, json.dumps({"source": "DOCUMENT_SEQUENCE"}))
                 await connection.execute('UPDATE "KnowledgeDocument" SET "currentVersionId"=$2,"updatedAt"=now() WHERE id=$1', document_id, version_id)
                 await connection.execute('''INSERT INTO "KnowledgeGraphBuild" (id,"versionId",status,"extractorVersion","entityCount","edgeCount","claimCount","startedAt","completedAt","createdAt") VALUES ($1,$2,'COMPLETED','microsoft-graphrag-3.1.1',$3,$4,0,now(),now(),now())''', f"kgb_{uuid4().hex}", version_id, len(entity_ids), max(0, len(entity_ids)-1))
-        await self._stage(run_id, "EMBEDDING", 65, 0, len(chunk_ids))
+        await self._stage(run_id, "EMBEDDING", 45, 0, len(chunk_ids))
         embedded_count = 0
         try:
             batch_size = max(1, settings.embedding_batch_size)
@@ -205,10 +273,12 @@ class GraphRagWorker:
                 for chunk_id, vector in zip(batch_ids, vectors):
                     await self.repository.pool.execute('UPDATE "KnowledgeChunk" SET embedding=$2::vector WHERE id=$1', chunk_id, vector_literal(vector))
                     embedded_count += 1
-                await self._stage(run_id, "EMBEDDING", 65 + min(20, int((offset + len(batch_ids)) / max(1, len(chunk_ids)) * 20)), offset + len(batch_ids), len(chunk_ids))
+                await self._stage(run_id, "EMBEDDING", 45 + min(30, int((offset + len(batch_ids)) / max(1, len(chunk_ids)) * 30)), offset + len(batch_ids), len(chunk_ids))
         except Exception as error:
             logger.warning("Embedding fallback for %s: %s", document_id, error)
-        await self._stage(run_id, "INDEXING", 90, len(chunk_ids), len(chunk_ids))
+            await self._stage(run_id, "EMBEDDING_SKIPPED", 75, embedded_count, len(chunk_ids))
+        await self._stage(run_id, "INDEXING", 85, len(chunk_ids), len(chunk_ids))
+        await self._stage(run_id, "VALIDATING", 95, len(chunk_ids), len(chunk_ids))
         return document_id, version_id, {"chunkCount": len(chunk_ids), "embeddedCount": embedded_count, "searchable": True, "embeddingFallback": embedded_count != len(chunk_ids)}
 
     async def _visualize_existing(self, run_id: str, payload: dict) -> tuple[str, str, dict]:

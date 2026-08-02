@@ -48,5 +48,13 @@ export async function POST(request: Request) {
       payload: { ...input.data, documentId: canonical?.id, actorId: admin.id, sourceHash } as Prisma.InputJsonValue,
     },
   });
+  const serviceUrl = process.env.AI_SERVICE_URL;
+  if (serviceUrl) {
+    try {
+      await fetch(`${serviceUrl}/retrieval/ingestion/wake`, { method: "POST", cache: "no-store", signal: AbortSignal.timeout(1500) });
+    } catch {
+      // Polling fallback handles Render cold starts and temporary network failures.
+    }
+  }
   return NextResponse.json({ runId: run.id, documentId: canonical?.id, status: run.status, stage: run.stage }, { status: 202 });
 }

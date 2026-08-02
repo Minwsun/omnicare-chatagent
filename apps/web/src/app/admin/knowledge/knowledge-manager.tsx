@@ -5,6 +5,7 @@ import Link from "next/link";
 
 type DocumentItem = { id:string; type:string; visibility:string; authorityLevel:number; archived:boolean; title:string; summary:string; priority:string; pipelineStatus:string; pipelineStage:string|null; pipelineProgress:number; latestRunId:string|null };
 const emptyForm = { documentId:"", title:"", content:"", kind:"GUIDE", visibility:"PUBLIC", importance:"MEDIUM", mandatory:false, priority:"NORMAL" };
+const stageLabels: Record<string,string> = { QUEUED:"Đang chờ worker", NORMALIZING:"Đang chuẩn hóa", CHUNKING:"Đang chia nội dung", PERSISTING:"Đang lưu tài liệu", EMBEDDING:"Đang tạo chỉ mục ngữ nghĩa", EMBEDDING_SKIPPED:"Đang dùng chỉ mục từ khóa", INDEXING:"Đang hoàn thiện chỉ mục", VALIDATING:"Đang kiểm tra", RETRY:"Đang tự thử lại", DONE:"Hoàn tất" };
 
 export default function KnowledgeManager({ initialDocuments }: { initialDocuments: DocumentItem[] }) {
   const [documents, setDocuments] = useState(initialDocuments);
@@ -45,7 +46,10 @@ export default function KnowledgeManager({ initialDocuments }: { initialDocument
     for (let attempt=0; attempt<180; attempt+=1) {
       const response = await fetch(`/api/admin/kb/ingestion-runs/${runId}`, { cache:"no-store" });
       const run = await response.json();
-      setStatus(`${run.stage || run.status} · ${run.progress || 0}%`);
+      const stage = stageLabels[run.stage || run.status] || run.stage || run.status;
+      const recovery = run.stale ? " · Worker đang tự phục hồi" : "";
+      const attempt = run.attempts > 1 ? ` · lần ${run.attempts}/3` : "";
+      setStatus(`${stage} · ${run.progress || 0}%${attempt}${recovery}`);
       if (run.status === "DONE") { window.location.reload(); return; }
       if (["CANCELLED","QUARANTINED"].includes(run.status)) { setBusy(false); setStatus(run.error || "Không thể xử lý tài liệu."); return; }
       await new Promise((resolve)=>setTimeout(resolve,1000));
