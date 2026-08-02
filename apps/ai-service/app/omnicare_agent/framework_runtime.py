@@ -632,7 +632,10 @@ class LangChainAgentRuntime:
     def _last_answer(messages: list[Any]) -> str:
         for item in reversed(messages):
             if isinstance(item, AIMessage) and item.content:
-                return item.content if isinstance(item.content, str) else json.dumps(item.content, ensure_ascii=False)
+                answer = item.content if isinstance(item.content, str) else json.dumps(item.content, ensure_ascii=False)
+                if "model call limits exceeded" in answer.casefold():
+                    return "Mình đã kiểm tra nhưng chưa thể hoàn tất yêu cầu trong lượt này. Bạn chọn hoặc cung cấp thêm thông tin cụ thể để mình tiếp tục nhé."
+                return answer
         return "Mình chưa thể hoàn tất yêu cầu này. Bạn thử diễn đạt lại ngắn gọn hơn nhé."
 
     @staticmethod

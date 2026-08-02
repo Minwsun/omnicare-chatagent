@@ -1,10 +1,17 @@
 import unittest
 
+from langchain_core.messages import AIMessage
+
+from app.omnicare_agent.framework_runtime import LangChainAgentRuntime
 from app.tool_adapters import get_order_details, search_knowledge
 from app.omnicare_agent.registry import tool_registry
 
 
 class LangChainRuntimeTests(unittest.TestCase):
+    def test_internal_model_limit_message_is_not_exposed(self):
+        answer = LangChainAgentRuntime._last_answer([AIMessage(content="Model call limits exceeded: run limit (3/3)")])
+        self.assertNotIn("Model call limits exceeded", answer)
+
     def test_transaction_tool_does_not_expose_customer_id(self):
         schema = get_order_details.args_schema.model_json_schema()
         self.assertEqual(set(schema["properties"]), {"order_id"})

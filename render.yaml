@@ -56,7 +56,7 @@ services:
       - key: GRAPHRAG_POLL_SECONDS
         value: "2"
       - key: AGENT_MAX_MODEL_CALLS
-        value: "2"
+        value: "3"
       - key: RETRIEVAL_TOKEN_BUDGET
         value: "1200"
       - key: RETRIEVAL_MAX_CHUNKS
