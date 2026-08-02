@@ -1,9 +1,14 @@
 import { PrismaClient } from "@prisma/client";
+import { createHash } from "node:crypto";
 import { hash } from "@node-rs/argon2";
 
 const prisma = new PrismaClient();
 const seedNow = new Date();
 const deliveryDate = new Date("2026-07-30T11:00:00.000Z");
+
+function knowledgeHash(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 function omniBrandText(value) {
   return value
@@ -166,8 +171,8 @@ async function upsertKnowledge({ id, type, visibility, categoryId, authority, ti
     create: { id: versionId, documentId: id, semanticVersion: version, title, summary, content, status: "PUBLISHED", effectiveFrom: new Date(`${effectiveFrom}T00:00:00.000Z`), effectiveTo: effectiveTo ? new Date(`${effectiveTo}T00:00:00.000Z`) : null, searchable: true, changeSummary: "Khởi tạo bộ tri thức kiểm thử đã qua validation", publishedAt: seedNow, publishedBy: "system_seed" },
   });
   await prisma.knowledgeChunk.upsert({
-    where: { id: chunkId }, update: { section: title, content, contentHash: hash(content), tokenCount: content.split(/\s+/).length },
-    create: { id: chunkId, versionId, section: title, content, contentHash: hash(content), tokenCount: content.split(/\s+/).length },
+    where: { id: chunkId }, update: { section: title, content, contentHash: knowledgeHash(content), tokenCount: content.split(/\s+/).length },
+    create: { id: chunkId, versionId, section: title, content, contentHash: knowledgeHash(content), tokenCount: content.split(/\s+/).length },
   });
   await prisma.knowledgeDocument.update({ where: { id }, data: { currentVersionId: versionId } });
   await buildKnowledgeGraph({ id, type, visibility, categoryId, authority, title, content, versionId, chunkId, effectiveFrom, effectiveTo });
