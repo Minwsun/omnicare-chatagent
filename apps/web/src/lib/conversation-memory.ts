@@ -5,6 +5,14 @@ import { prisma } from "@/lib/prisma";
 const TRANSACTION_INTENTS = new Set(["ORDER_TRACKING", "ORDER_CANCELLATION", "PAYMENT_STATUS", "REFUND_STATUS", "RETURN_ELIGIBILITY", "PRODUCT_DISCOVERY", "CHECKOUT"]);
 const CONTEXT_RESET_INTENTS = new Set(["OUT_OF_SCOPE"]);
 
+type MemoryResult = {
+  intent?: string;
+  resolved_context?: Record<string, unknown>;
+  missing_facts?: string[];
+  verified_facts?: Array<{ key: string; value: Prisma.InputJsonValue; source?: string }>;
+  confidence?: number;
+};
+
 function redactSensitive(value: string) {
   return value
     .replace(/\b\d{6}\b/g, "[REDACTED_OTP]")
@@ -36,7 +44,7 @@ export async function loadConversationContext(conversationId: string, customerId
   };
 }
 
-export async function persistConversationMemory(params: { conversationId: string; customerId: string; inboundMessageId: string; result: any }) {
+export async function persistConversationMemory(params: { conversationId: string; customerId: string; inboundMessageId: string; result: MemoryResult }) {
   const { conversationId, customerId, inboundMessageId, result } = params;
   const [existing, messages] = await Promise.all([
     prisma.conversationMemory.findUnique({ where: { conversationId } }),

@@ -1,8 +1,24 @@
 # OmniCare AI Customer Support Hub
 
-MVP hỗ trợ khách hàng có căn cứ: customer/order/payment/shipment tools, Knowledge Platform, LangGraph workflow, citation và safe handoff.
+Nền tảng chăm sóc khách hàng dùng Next.js, FastAPI, PostgreSQL, LangChain/LangGraph, transaction tools, hybrid RAG, citation, streaming và human handoff.
+
+## Production
+
+- Web: `https://omnicare-chatagent.vercel.app`
+- AI health: `https://omnicare-ai-service.onrender.com/health`
+
+## Tài liệu
+
+- [Kiến trúc hệ thống](docs/architecture.md)
+- [Hướng dẫn sử dụng web đã deploy](docs/deployed-web-guide.md)
+- [Công cụ, mô hình, API và nguồn tham khảo](docs/technical-inventory.md)
+- [Phương pháp evaluation chống overfit](docs/holdout-evaluation.md)
 
 ## Chạy local
+
+1. Sao chép `.env.example` thành `.env` và điền credential local.
+2. Không commit `.env`, API key hoặc database URL.
+3. Chạy:
 
 ```powershell
 docker compose up --build
@@ -10,56 +26,27 @@ docker compose up --build
 
 - Web: `http://localhost:3000`
 - AI health: `http://localhost:8000/health`
-- Orders: `http://localhost:3000/orders`
-- Help Center: `http://localhost:3000/help`
-- Login: `http://localhost:3000/login`
-- Customer portal: `http://localhost:3000/portal`
-- Admin portal: `http://localhost:3000/admin`
 
-Docker startup tự chạy Prisma migrations và deterministic seed.
-
-Dataset mặc định gồm 20 khách hàng, 60 đơn hàng, 408 knowledge documents, 40 historical tickets, 12 incidents và 100 evaluation cases.
-
-## Tài khoản demo
-
-- Admin: `admin@test.com` / `admin`
-- Customer 1: `user1@test.com` / `user`
-- Customer 2: `user2@test.com` / `user`
-
-Đổi toàn bộ mật khẩu trước khi deploy public.
-
-## Agent runtime
-
-- LangGraph supervisor chạy transaction, incident và knowledge subgraphs song song.
-- Transaction access qua LangChain `@tool`; trusted customer context không nằm trong model arguments.
-- PostgreSQL checkpointer lưu state theo `conversation_id`.
-- GraphRAG dùng entities, edges và claims có provenance về document/version/chunk.
-- LangSmith chỉ bật khi có khóa mới hợp lệ; khóa đã gửi trong chat không được tái sử dụng.
-
-## Kiểm tra không cần Docker
+## Kiểm thử
 
 ```powershell
-cd apps/web
-$env:DATABASE_URL='<postgresql-connection-string>'
-npm run build
-npm run lint
-
-cd ../ai-service
-$env:PYTHONPATH='.'
-py -3.13 -m unittest discover -s tests -v
+npm test
+npm run eval:audit
+npm --prefix apps/web run lint
+npm --prefix apps/web run build
 ```
 
-## An toàn
+E2E production:
 
-- Customer identity và order ownership bắt buộc trước mọi transaction lookup.
-- `AUTHORIZED` không được diễn giải thành đã thanh toán.
-- ETA là dự kiến, không phải cam kết.
-- Refund/cancellation/account deletion chỉ tạo `PENDING_APPROVAL` proposal.
-- Internal, expired, archived và draft knowledge không được public citation.
-- System prompt: `apps/ai-service/app/prompts/core_system.md`.
+```powershell
+npm run test:e2e:production
+npm run test:e2e:handoff
+```
 
-## Giới hạn hiện tại
+## Nguyên tắc an toàn
 
-- Email là simulator; không kết nối provider thật.
-- Embedding column đã có; retrieval hiện dùng PostgreSQL full-text deterministic. Vector embedding cần provider cấu hình.
-- Docker Desktop phải chạy để kiểm thử migration và end-to-end local.
+- Identity và order ownership được xác minh ở backend trước transaction lookup.
+- Write action dùng idempotency và confirmation theo mức rủi ro.
+- Refund cần human approval.
+- Knowledge draft, internal, expired hoặc archived không được citation công khai.
+- Secret chỉ nằm trong environment của Render/Vercel hoặc `.env` local đã ignore.

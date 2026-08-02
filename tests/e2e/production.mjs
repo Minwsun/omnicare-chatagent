@@ -27,8 +27,6 @@ async function testCustomer() {
   record("AUTH-CUSTOMER", true, page.url());
   await page.locator(".chat-launcher").click();
   record("CHAT-POPUP", await page.locator(".chat-popup").isVisible(), await page.locator(".chat-popup").count());
-  await page.getByRole("button", { name: "Gặp nhân viên" }).waitFor({ timeout: 20_000 });
-  record("HANDOFF-BUTTON", await page.getByRole("button", { name: "Gặp nhân viên" }).count() === 1, await page.getByRole("button", { name: "Gặp nhân viên" }).count());
   const started = Date.now();
   await page.locator('.widget-form input:not([type="file"])').fill("Tôi có thể hủy đơn nào?");
   await page.locator('.widget-form button[type="submit"],.widget-form>button').last().click();

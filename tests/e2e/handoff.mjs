@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
 
-const base = process.env.WEB_BASE_URL || "http://localhost:3100";
+const base = process.env.WEB_BASE_URL || "https://omnicare-chatagent.vercel.app";
 const marker = `HANDOFF-${Date.now()}`;
 const browser = await chromium.launch({ headless: true });
 const results = [];
@@ -26,9 +26,9 @@ const admin = await adminContext.newPage();
 try {
   await login(customer, "user1@test.com", "user", "/portal");
   await customer.locator(".chat-launcher").click();
-  customer.once("dialog", dialog => dialog.accept());
-  await customer.getByRole("button", { name: "Gặp nhân viên" }).click();
-  await customer.locator(".handoff-card").waitFor({ timeout: 30_000 });
+  await customer.locator('.widget-form input:not([type="file"])').fill(`Tôi muốn gặp nhân viên hỗ trợ. Mã kiểm thử ${marker}`);
+  await customer.locator('.widget-form button[type="submit"],.widget-form>button').last().click();
+  await customer.locator(".handoff-card").waitFor({ timeout: 120_000 });
   const customerCard = await customer.locator(".handoff-card").innerText();
   const ticketId = customerCard.match(/TCK-[A-Z0-9-]+/)?.[0];
   record("CUSTOMER-CREATES-HANDOFF", Boolean(ticketId), customerCard);
@@ -36,7 +36,7 @@ try {
   await login(admin, "admin@test.com", "admin", "/admin");
   await admin.goto(`${base}/admin/inbox`, { waitUntil: "networkidle", timeout: 60_000 });
   await admin.locator(".ticket-queue>button").filter({ hasText: ticketId }).click();
-  await admin.getByRole("button", { name: "Nhận xử lý" }).click();
+  await admin.getByRole("button", { name: "Tham gia cuộc trò chuyện" }).click();
   await admin.getByPlaceholder("Nhập phản hồi cho khách hàng").waitFor({ timeout: 30_000 });
   record("ADMIN-CLAIMS", true, ticketId);
 
@@ -44,9 +44,10 @@ try {
     const response = await fetch(`/api/admin/tickets/${id}`);
     return (await response.json()).ticket.conversation.aiRuns.length;
   }, ticketId);
-  await customer.locator('.widget-form input:not([type="file"])').fill("Tôi bổ sung thêm thông tin sau khi nhân viên nhận xử lý.");
+  const followUp = `Tôi bổ sung thêm thông tin sau khi nhân viên nhận xử lý ${marker}.`;
+  await customer.locator('.widget-form input:not([type="file"])').fill(followUp);
   await customer.locator('.widget-form button[type="submit"],.widget-form>button').last().click();
-  await customer.getByText("Mình đã gửi tin nhắn này tới nhân viên đang hỗ trợ bạn.", { exact: true }).waitFor({ timeout: 20_000 });
+  await admin.getByText(followUp, { exact: true }).waitFor({ timeout: 30_000 });
   const runsAfter = await admin.evaluate(async id => {
     const response = await fetch(`/api/admin/tickets/${id}`);
     return (await response.json()).ticket.conversation.aiRuns.length;
