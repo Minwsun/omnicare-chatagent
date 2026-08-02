@@ -175,6 +175,8 @@ class SupervisorHarness:
             heuristic = "PROMPT_INJECTION"
         normalized = state.get("canonical_query") or state["normalized_query"]
         deterministic_intent = self.classify(state["normalized_query"])
+        if deterministic_intent == "HUMAN_REQUEST":
+            heuristic = "HUMAN_REQUEST"
         if heuristic in {"OUT_OF_SCOPE", "SOCIAL", "HUMAN_REQUEST"} and deterministic_intent not in {"KNOWLEDGE", "OUT_OF_SCOPE", "SOCIAL", "HUMAN_REQUEST"}:
             heuristic = deterministic_intent
         if heuristic == "HUMAN_REQUEST" and not any(term in normalized for term in ("nhân viên", "người thật", "gặp người", "chuyển người hỗ trợ")):

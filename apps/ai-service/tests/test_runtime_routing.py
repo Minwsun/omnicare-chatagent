@@ -1,6 +1,6 @@
 import unittest
 
-from app.omnicare_agent.runtime import OmniCareAgentRuntime, classify, normalize_order_id, normalize_support_text, requests_policy_conflict_resolution
+from app.omnicare_agent.runtime import OmniCareAgentRuntime, classify, human_handoff_signal, normalize_order_id, normalize_support_text, requests_policy_conflict_resolution
 
 
 class RuntimeRoutingTests(unittest.TestCase):
@@ -63,6 +63,34 @@ class RuntimeRoutingTests(unittest.TestCase):
 
     def test_routes_account_order_summary(self):
         self.assertEqual(classify("Tài khoản của tôi có mấy đơn?"), "ACCOUNT_ORDERS")
+
+    def test_human_handoff_ontology_handles_typos_and_multi_intent(self):
+        positives = (
+            "cần gặp tư vấn viên",
+            "cho gặp tư vấn viên",
+            "cần trả hàng cho tôi gặp tự vánas viên",
+            "tôi muốn nói chuyện với người thật",
+            "kết nối giúp tôi với CSKH",
+            "cân fgapwj nhân viên",
+        )
+        for content in positives:
+            with self.subTest(content=content):
+                requested, confidence = human_handoff_signal(content)
+                self.assertTrue(requested)
+                self.assertGreaterEqual(confidence, 0.9)
+                self.assertEqual(classify(content), "HUMAN_REQUEST")
+
+    def test_human_handoff_ontology_rejects_information_and_negation(self):
+        negatives = (
+            "tư vấn viên làm việc lúc mấy giờ",
+            "không cần gặp nhân viên nữa",
+            "tôi muốn được tư vấn sản phẩm",
+            "chính sách chăm sóc khách hàng là gì",
+        )
+        for content in negatives:
+            with self.subTest(content=content):
+                self.assertFalse(human_handoff_signal(content)[0])
+                self.assertNotEqual(classify(content), "HUMAN_REQUEST")
 
 
 if __name__ == "__main__":

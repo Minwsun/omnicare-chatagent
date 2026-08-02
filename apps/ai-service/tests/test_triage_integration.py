@@ -18,6 +18,8 @@ class TriageIntegrationTests(unittest.IsolatedAsyncioTestCase):
         triage = triage_request("cân fgapwj nhân viên", "customer_001")
         response = apply_triage(GroundedAgentResponse(answer="Đã ghi nhận.", confidence=0.96, intent="HUMAN_REQUEST"), triage)
         self.assertTrue(response.requires_human)
+        self.assertTrue(response.handoff_requested)
+        self.assertGreater(response.handoff_confidence, 0)
         self.assertEqual(response.escalation_reason, "CUSTOMER_REQUEST")
         self.assertEqual(response.case_state, "HANDOFF")
 

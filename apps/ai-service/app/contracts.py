@@ -211,6 +211,8 @@ class GroundedAgentResponse(BaseModel):
     pending_action: Optional[PendingAgentAction] = None
     conversation_state: Literal["ANSWERED", "AWAITING_INPUT", "AWAITING_CONFIRMATION", "COMPLETED"] = "ANSWERED"
     requires_human: bool = False
+    handoff_requested: bool = False
+    handoff_confidence: float = Field(default=0, ge=0, le=1)
     escalation_reason: Optional[str] = None
     run_id: Optional[str] = None
     review_status: Literal["PASSED", "REWRITE", "FALLBACK", "HANDOFF"] = "PASSED"

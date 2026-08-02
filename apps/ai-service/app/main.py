@@ -65,6 +65,8 @@ def apply_triage(response: GroundedAgentResponse, triage: TriageResult) -> Groun
     response.priority_reasons = triage.priority_reasons
     response.request_fingerprint = triage.request_fingerprint
     if response.intent == "HUMAN_REQUEST":
+        response.handoff_requested = True
+        response.handoff_confidence = max(response.handoff_confidence, response.confidence)
         response.requires_human = True
         response.escalation_reason = response.escalation_reason or "CUSTOMER_REQUEST"
     if triage.requires_human or response.requires_human:
@@ -95,6 +97,8 @@ async def ensure_handoff(message: IncomingMessage, response: GroundedAgentRespon
                 "intent": response.intent,
                 "confidence": response.confidence,
                 "escalationReason": response.escalation_reason,
+                "handoffRequested": response.handoff_requested,
+                "handoffConfidence": response.handoff_confidence,
                 "missingFacts": response.missing_facts,
                 "citations": [item.model_dump(mode="json") for item in response.citations],
                 "toolCalls": [item.model_dump(mode="json") for item in response.tool_calls],

@@ -104,7 +104,8 @@ export async function POST(request: Request) {
         const raw = block.match(/^data: (.+)$/m)?.[1];
         if (!raw) continue;
         const result = JSON.parse(raw);
-        if (result.intent === "HUMAN_REQUEST") {
+        if (result.intent === "HUMAN_REQUEST" || result.handoff_requested) {
+          result.handoff_requested = true;
           result.requires_human = true;
           result.escalation_reason ||= "CUSTOMER_REQUEST";
         }

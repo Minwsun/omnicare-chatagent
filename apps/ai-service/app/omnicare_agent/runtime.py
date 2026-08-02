@@ -88,6 +88,43 @@ def fuzzy_phrase(text: str, phrases: tuple[str, ...], threshold: float = 0.82) -
     return False
 
 
+def human_handoff_signal(content: str) -> tuple[bool, float]:
+    text = normalize_support_text(content)
+    ascii_text = "".join(character for character in unicodedata.normalize("NFKD", text) if not unicodedata.combining(character)).replace("đ", "d")
+    words = re.findall(r"[a-z0-9]+", ascii_text)
+    if any(phrase in ascii_text for phrase in ("khong can gap", "khong muon gap", "dung chuyen", "khong can nhan vien", "khong can tu van vien")):
+        return False, 1.0
+    if any(phrase in ascii_text for phrase in ("lam viec luc", "gio nao", "may gio", "thoi gian lam viec")):
+        return False, 1.0
+
+    role_phrases = ("nhan vien", "tu van vien", "cham soc khach hang", "nguoi ho tro", "nguoi that", "quan ly", "support agent", "cskh")
+    role_span: tuple[int, int] | None = None
+    role_score = 0.0
+    for phrase in role_phrases:
+        phrase_words = phrase.split()
+        for size in range(max(1, len(phrase_words) - 1), len(phrase_words) + 2):
+            for index in range(len(words) - size + 1):
+                candidate = " ".join(words[index:index + size])
+                score = 1.0 if candidate == phrase else SequenceMatcher(None, candidate, phrase).ratio()
+                if score > role_score:
+                    role_score = score
+                    role_span = (index, index + size)
+    if role_span is None or role_score < 0.82:
+        return False, 0.0
+
+    start, end = role_span
+    nearby = words[max(0, start - 5):min(len(words), end + 5)]
+    nearby_text = " ".join(nearby)
+    exact_actions = ("gap", "cho gap", "can gap", "muon gap", "noi chuyen voi", "ket noi", "lien he", "chuyen den", "chuyen cho", "goi")
+    action_score = 1.0 if any(action in nearby_text for action in exact_actions) else 0.0
+    for word in nearby:
+        action_score = max(action_score, SequenceMatcher(None, word, "gap").ratio())
+    requested_role = any(word in nearby for word in ("can", "muon", "cho"))
+    requested = action_score >= 0.72 or (requested_role and role_score >= 0.9)
+    confidence = min(0.99, (role_score + max(action_score, 0.8 if requested_role else 0.0)) / 2)
+    return requested, confidence if requested else 0.0
+
+
 def normalize_order_id(content: str, page_context: dict[str, Any] | None = None) -> str | None:
     match = ORDER_PATTERN.search(content)
     if match:
@@ -121,6 +158,8 @@ def classify(content: str) -> str:
         return "SOCIAL"
     if any(term in text for term in ("system prompt", "fraud threshold", "ignore previous", "bỏ qua hướng dẫn", "tool bí mật", "tài liệu internal", "giả làm admin")):
         return "PROMPT_INJECTION"
+    if human_handoff_signal(content)[0]:
+        return "HUMAN_REQUEST"
     if any(term in text for term in ("viết code", "thời tiết", "chứng khoán", "tích phân", "kể một câu chuyện", "viết bài thơ", "làm thơ")):
         return "OUT_OF_SCOPE"
     if any(term in text for term in ("voucher", "mã giảm giá", "khuyến mãi")):
@@ -163,8 +202,6 @@ def classify(content: str) -> str:
         return "SHIPPING_POLICY"
     if "ord" in text and any(term in text for term in ("xem đơn", "kiểm tra đơn", "đơn ord", "giao không", "tình trạng đơn", "khi nào", "người nhận")):
         return "ORDER_TRACKING"
-    if any(term in text for term in ("nhân viên", "người hỗ trợ", "gặp người thật")):
-        return "HUMAN_REQUEST"
     return "KNOWLEDGE"
 
 
