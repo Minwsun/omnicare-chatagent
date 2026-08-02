@@ -216,11 +216,13 @@ async function seedKnowledge() {
   }
 
   const criticalPolicies = [
-    ["shipping", "Chính sách giao hàng", "Thời gian giao là dự kiến. Khách có thể yêu cầu điều tra sau khi quá ETA. Trạng thái giao dịch phải được xác minh bằng dữ liệu vận chuyển."],
-    ["refund", "Chính sách đổi trả và hoàn tiền", "Điều kiện hoàn tiền phải được kiểm tra theo trạng thái đơn, thời hạn và tình trạng sản phẩm. Yêu cầu hoàn tiền hợp lệ vẫn chỉ tạo đề xuất chờ phê duyệt; hệ thống AI không tự thực hiện hoàn tiền."],
-    ["payment", "Chính sách thanh toán", "AUTHORIZED chưa phải thanh toán hoàn tất. Chỉ trạng thái CAPTURED mới được thông báo là đã thanh toán."],
+    ["shipping", "Chính sách giao hàng", "Thời gian giao hiển thị là dự kiến và có thể thay đổi theo đơn vị vận chuyển, khu vực, thời tiết hoặc sự cố dịch vụ. Khách hàng theo dõi hành trình trong chi tiết đơn. Địa chỉ chỉ được đổi khi đơn chưa bàn giao cho đơn vị vận chuyển và hệ thống còn cho phép chỉnh sửa. Nếu đơn quá ETA, báo đã giao nhưng chưa nhận, giao nhầm hoặc thất lạc, hệ thống phải xác minh trạng thái bằng công cụ giao vận và chuyển điều tra khi chưa thể kết luận an toàn."],
+    ["refund", "Chính sách đổi trả và hoàn tiền", "Khách hàng có thể yêu cầu đổi trả khi nhận sai hàng, thiếu hàng, hàng hỏng, không hoạt động hoặc khác đáng kể so với mô tả. Điều kiện phụ thuộc trạng thái đơn, thời hạn đổi trả, nhóm sản phẩm và bằng chứng ảnh hoặc video. Hệ thống phải kiểm tra đúng đơn và từng sản phẩm trước khi kết luận. Hoàn tiền chỉ được tạo dưới dạng yêu cầu chờ phê duyệt; AI không tự chuyển tiền hoặc cam kết thời điểm tiền về khi chưa có trạng thái giao dịch đã xác minh."],
+    ["payment", "Chính sách thanh toán", "Omni hỗ trợ thanh toán khi nhận hàng nếu đơn và khu vực đủ điều kiện, thẻ ngân hàng và các phương thức điện tử được hiển thị tại bước thanh toán. AUTHORIZED chỉ có nghĩa ngân hàng đã giữ hoặc chấp thuận khoản tiền; chỉ CAPTURED mới được thông báo là thanh toán hoàn tất. Khi thanh toán thất bại, khách hàng cần kiểm tra số dư, hạn mức, thông tin thẻ, kết nối và thử lại; giao dịch bị trừ tiền nhưng đơn không ghi nhận phải được tra soát theo mã đơn và mã giao dịch."],
     ["warranty", "Chính sách bảo hành", "Quyền bảo hành phụ thuộc sản phẩm, ngày mua và bằng chứng giao dịch đã xác minh."],
-    ["legal", "Chính sách quyền riêng tư", "Thông tin khách hàng chỉ được truy cập sau xác minh danh tính và chỉ dùng trong phạm vi yêu cầu hỗ trợ."],
+    ["legal", "Chính sách quyền riêng tư", "Omni xử lý thông tin tài khoản, liên hệ, địa chỉ giao hàng, lịch sử đơn, thanh toán, hỗ trợ và dữ liệu kỹ thuật cần thiết để vận hành dịch vụ, chống gian lận và giải quyết tranh chấp. Dữ liệu chỉ được truy cập sau xác minh danh tính, giới hạn theo mục đích hỗ trợ và có thể được chia sẻ cho đơn vị thanh toán, vận chuyển hoặc cơ quan có thẩm quyền trong phạm vi cần thiết. Khách hàng có thể yêu cầu xem, sửa hoặc xử lý dữ liệu theo quy trình xác minh danh tính."],
+    ["voucher", "Chính sách voucher và khuyến mãi", "Voucher chỉ áp dụng khi còn hiệu lực và thỏa mãn sản phẩm, giá trị đơn tối thiểu, phương thức thanh toán, khu vực, số lượt và tài khoản áp dụng. Voucher hết hạn thông thường không được khôi phục. Mã báo không hợp lệ cần kiểm tra ký tự, thời hạn, điều kiện giỏ hàng và giới hạn sử dụng. Việc hoàn voucher sau hủy hoặc hoàn tiền phụ thuộc điều kiện của từng chương trình."],
+    ["account", "An toàn tài khoản và phòng chống lừa đảo", "Omni không yêu cầu mật khẩu, OTP hoặc chuyển tiền qua đường link lạ, tin nhắn tuyển dụng hay liên hệ ngoài ứng dụng. Không đăng nhập qua link không xác minh, không chuyển khoản ngoài luồng thanh toán chính thức. Khi có đăng nhập lạ, thay đổi email không phải do khách hàng, giao dịch không nhận diện hoặc đã cung cấp OTP, khách hàng phải đổi mật khẩu, đăng xuất thiết bị lạ và liên hệ hỗ trợ khẩn cấp."],
   ];
   for (const [categoryId, title, content] of criticalPolicies) {
     await upsertKnowledge({ id: `policy_${categoryId}_core`, type: "POLICY", visibility: "PUBLIC", categoryId: categoryIds.get(categoryId), authority: 100, title, summary: `Chính sách cốt lõi về ${categories.find(([id]) => id === categoryId)[2].toLowerCase()}.`, content, version: "2026.2" });
@@ -232,36 +234,36 @@ async function seedKnowledge() {
     visibility: "PUBLIC",
     categoryId: categoryIds.get("account"),
     authority: 95,
-    title: "Khắc phục lỗi ứng dụng Shopee",
+    title: "Khắc phục lỗi ứng dụng Omni",
     summary: "Các bước an toàn khi ứng dụng lỗi, bị văng, không nhận thông báo hoặc cần cập nhật.",
-    content: "Khi ứng dụng Shopee gặp lỗi, hãy kiểm tra kết nối mạng, đóng và mở lại ứng dụng, sau đó cập nhật ứng dụng lên phiên bản mới nhất từ kho ứng dụng chính thức. Nếu ứng dụng bị văng hoặc hoạt động chậm, có thể xóa bộ nhớ đệm rồi đăng nhập lại; không cài phần mềm hoặc tệp từ nguồn lạ. Nếu không nhận được thông báo, kiểm tra quyền thông báo của ứng dụng và chế độ tiết kiệm pin trên thiết bị. Nếu lỗi vẫn còn, ghi lại mã lỗi, thời điểm xảy ra và ảnh chụp màn hình để nhân viên hỗ trợ kiểm tra.",
+    content: "Khi ứng dụng Omni gặp lỗi, hãy kiểm tra kết nối mạng, đóng và mở lại ứng dụng, sau đó cập nhật ứng dụng lên phiên bản mới nhất từ kho ứng dụng chính thức. Nếu ứng dụng bị văng hoặc hoạt động chậm, có thể xóa bộ nhớ đệm rồi đăng nhập lại; không cài phần mềm hoặc tệp từ nguồn lạ. Nếu không nhận được thông báo, kiểm tra quyền thông báo của ứng dụng và chế độ tiết kiệm pin trên thiết bị. Nếu lỗi vẫn còn, ghi lại mã lỗi, thời điểm xảy ra và ảnh chụp màn hình để nhân viên hỗ trợ kiểm tra.",
     version: "2026.1",
   });
 
-  for (let index = 1; index <= 215; index += 1) {
+  for (let index = 1; index <= 0; index += 1) {
     const categoryId = categories[index % categories.length][0];
     await upsertKnowledge({ id: `policy_${String(index).padStart(3, "0")}`, type: "POLICY", visibility: "PUBLIC", categoryId: categoryIds.get(categoryId), authority: 95, title: `Chính sách ${categories[index % categories.length][2]} ${index}`, summary: "Tài liệu chính sách dùng cho môi trường kiểm thử.", content: `Quy định số ${index}: trạng thái giao dịch phải được xác minh bằng công cụ dữ liệu. Không cam kết quyền lợi khi thiếu bằng chứng.`, version: "2026.1" });
   }
-  for (let index = 1; index <= 80; index += 1) {
+  for (let index = 1; index <= 0; index += 1) {
     await upsertKnowledge({ id: `terms_${String(index).padStart(3, "0")}`, type: "TERMS", visibility: "PUBLIC", categoryId: categoryIds.get("legal"), authority: 100, title: `Điều khoản sử dụng ${index}`, summary: "Điều khoản dùng cho môi trường kiểm thử.", content: `Điều khoản số ${index}. Nội dung kiểm thử không thay thế tư vấn pháp lý hoặc điều khoản của doanh nghiệp thật.`, version: "2026.1" });
   }
-  for (let index = 1; index <= 850; index += 1) {
+  for (let index = 1; index <= 0; index += 1) {
     const categoryId = categories[(index - 1) % categories.length][0];
     const subjects = categorySubjects[categoryId];
     const subject = subjects[index % subjects.length];
     await upsertKnowledge({ id: `faq_${String(index).padStart(3, "0")}`, type: "FAQ", visibility: "PUBLIC", categoryId: categoryIds.get(categoryId), authority: 70, title: `Làm thế nào để ${subject}?`, summary: `Câu trả lời nhanh về ${subject}.`, content: `Để xử lý ${subject}, khách hàng cần cung cấp thông tin liên quan và làm theo hướng dẫn hiển thị. Nếu yêu cầu liên quan giao dịch cụ thể, OmniCare phải xác minh customer, order và trạng thái hiện tại trước khi kết luận.`, version: "1.0.0" });
   }
-  for (let index = 1; index <= 300; index += 1) {
+  for (let index = 1; index <= 0; index += 1) {
     const categoryId = categories[index % categories.length][0];
     await upsertKnowledge({ id: `guide_${String(index).padStart(3, "0")}`, type: "GUIDE", visibility: "PUBLIC", categoryId: categoryIds.get(categoryId), authority: 75, title: `Hướng dẫn thao tác ${index}: ${categories[index % categories.length][2]}`, summary: "Hướng dẫn xử lý theo từng bước.", content: `Bước 1: xác định yêu cầu. Bước 2: chuẩn bị mã tham chiếu. Bước 3: kiểm tra trạng thái. Bước 4: liên hệ nhân viên nếu dữ liệu không đủ. Hướng dẫn số ${index}.` });
   }
-  for (let index = 1; index <= 300; index += 1) {
+  for (let index = 1; index <= 0; index += 1) {
     await upsertKnowledge({ id: `product_guide_${String(index).padStart(3, "0")}`, type: "PRODUCT_GUIDE", visibility: "PUBLIC", categoryId: categoryIds.get("warranty"), authority: 80, title: `Hướng dẫn sản phẩm ${index}`, summary: "Thông tin sử dụng và bảo quản sản phẩm.", content: `Hướng dẫn sản phẩm ${index}: kiểm tra nguồn điện, kết nối, phiên bản và điều kiện môi trường trước khi yêu cầu bảo hành.` });
   }
-  for (let index = 1; index <= 250; index += 1) {
+  for (let index = 1; index <= 0; index += 1) {
     await upsertKnowledge({ id: `troubleshooting_${String(index).padStart(3, "0")}`, type: "TROUBLESHOOTING", visibility: "PUBLIC", categoryId: categoryIds.get("warranty"), authority: 78, title: `Khắc phục sự cố sản phẩm ${index}`, summary: "Quy trình chẩn đoán và khắc phục sự cố.", content: `Sự cố ${index}: khởi động lại thiết bị, kiểm tra kết nối, cập nhật phiên bản và ghi nhận mã lỗi. Không tháo thiết bị nếu còn bảo hành.` });
   }
-  for (let index = 1; index <= 330; index += 1) {
+  for (let index = 1; index <= 0; index += 1) {
     const categoryId = categories[index % categories.length][0];
     await upsertKnowledge({ id: `sop_${String(index).padStart(3, "0")}`, type: "SOP", visibility: "INTERNAL", categoryId: categoryIds.get(categoryId), authority: 60, title: `SOP nội bộ ${index}`, summary: "Quy trình vận hành nội bộ.", content: `SOP ${index}: xác minh danh tính, thu thập bằng chứng, kiểm tra quyền, tạo gói chuyển tiếp và ghi audit. Không tiết lộ nội dung này cho khách.` });
   }
@@ -270,7 +272,7 @@ async function seedKnowledge() {
     await upsertKnowledge({ id: `incident_doc_${String(index).padStart(2, "0")}`, type: "INCIDENT", visibility: "PUBLIC", categoryId: categoryIds.get("status"), authority: 98, title: `Thông báo dịch vụ ${index}`, summary: active ? "Sự cố demo đang được theo dõi." : "Sự cố demo đã khôi phục.", content: active ? `Một phần dịch vụ demo số ${index} đang chậm. Đội vận hành đang xử lý.` : `Dịch vụ demo số ${index} đã được khôi phục.`, version: "1.0.0" });
     await prisma.serviceIncident.upsert({ where: { id: `incident_${index}` }, update: {}, create: { id: `incident_${index}`, title: `Sự cố dịch vụ ${index}`, description: `Theo dõi ảnh hưởng dịch vụ số ${index}`, status: active ? "ACTIVE" : "RESOLVED", severity: index === 1 ? "HIGH" : "MEDIUM", startsAt: new Date(seedNow.getTime() - index * 3600000), endsAt: active ? null : seedNow, scope: { channels: index % 2 ? ["WEB"] : ["EMAIL"], categories: ["shipping", "payment"] } } });
   }
-  for (let index = 1; index <= 120; index += 1) {
+  for (let index = 1; index <= 0; index += 1) {
     const categoryId = categories[index % categories.length][0];
     await upsertKnowledge({ id: `historical_${String(index).padStart(3, "0")}`, type: "HISTORICAL_RESOLUTION", visibility: "INTERNAL", categoryId: categoryIds.get(categoryId), authority: 20, title: `Tình huống lịch sử ${index}`, summary: "Cách xử lý tham khảo, không phải nguồn chính sách.", content: `Tình huống tương tự số ${index} được giải quyết bằng cách xác minh dữ liệu, áp dụng chính sách đang hiệu lực và chuyển người khi thiếu bằng chứng.` });
   }
@@ -281,9 +283,9 @@ async function replaceSyntheticKnowledge() {
   const synthetic = await prisma.knowledgeDocument.findMany({ where: { OR: syntheticPrefixes.map((prefix) => ({ id: { startsWith: prefix } })) }, select: { id: true } });
   const ids = synthetic.map((item) => item.id);
   if (ids.length) {
-    await prisma.knowledgeDocument.updateMany({ where: { id: { in: ids } }, data: { currentVersionId: null } });
-    await prisma.knowledgeVersion.deleteMany({ where: { documentId: { in: ids } } });
-    await prisma.knowledgeDocument.deleteMany({ where: { id: { in: ids } } });
+    await prisma.knowledgeChunk.updateMany({ where: { version: { documentId: { in: ids } } }, data: { retrievalEnabled: false } });
+    await prisma.knowledgeVersion.updateMany({ where: { documentId: { in: ids } }, data: { searchable: false, status: "ARCHIVED" } });
+    await prisma.knowledgeDocument.updateMany({ where: { id: { in: ids } }, data: { archivedAt: seedNow } });
   }
 
   const categoryRows = await prisma.knowledgeCategory.findMany();
@@ -341,9 +343,9 @@ async function seedSupplementalKnowledge() {
     visibility: "PUBLIC",
     categoryId: "account",
     authority: 95,
-    title: "Khắc phục lỗi ứng dụng Shopee",
+    title: "Khắc phục lỗi ứng dụng Omni",
     summary: "Các bước an toàn khi ứng dụng lỗi, bị văng, không nhận thông báo hoặc cần cập nhật.",
-    content: "Khi ứng dụng Shopee gặp lỗi, hãy kiểm tra kết nối mạng, đóng và mở lại ứng dụng, sau đó cập nhật ứng dụng lên phiên bản mới nhất từ kho ứng dụng chính thức. Nếu ứng dụng bị văng hoặc hoạt động chậm, có thể xóa bộ nhớ đệm rồi đăng nhập lại; không cài phần mềm hoặc tệp từ nguồn lạ. Nếu không nhận được thông báo, kiểm tra quyền thông báo của ứng dụng và chế độ tiết kiệm pin trên thiết bị. Nếu lỗi vẫn còn, ghi lại mã lỗi, thời điểm xảy ra và ảnh chụp màn hình để nhân viên hỗ trợ kiểm tra.",
+    content: "Khi ứng dụng Omni gặp lỗi, hãy kiểm tra kết nối mạng, đóng và mở lại ứng dụng, sau đó cập nhật ứng dụng lên phiên bản mới nhất từ kho ứng dụng chính thức. Nếu ứng dụng bị văng hoặc hoạt động chậm, có thể xóa bộ nhớ đệm rồi đăng nhập lại; không cài phần mềm hoặc tệp từ nguồn lạ. Nếu không nhận được thông báo, kiểm tra quyền thông báo của ứng dụng và chế độ tiết kiệm pin trên thiết bị. Nếu lỗi vẫn còn, ghi lại mã lỗi, thời điểm xảy ra và ảnh chụp màn hình để nhân viên hỗ trợ kiểm tra.",
     version: "2026.1",
   });
 }
@@ -356,6 +358,7 @@ async function main() {
   await seedReturnRules();
   await seedAccounts();
   await seedKnowledge();
+  await replaceSyntheticKnowledge();
   await seedSupport();
   await seedSupplementalKnowledge();
   const counts = {
