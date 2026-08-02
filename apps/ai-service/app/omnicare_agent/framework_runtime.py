@@ -21,6 +21,7 @@ from langchain.agents.structured_output import ToolStrategy
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
 from pydantic import BaseModel, Field
 
+from ..config import settings
 from ..contracts import AgentChoice, AgentUiComponent, Citation, ClarificationRequest, GroundedAgentResponse, IncomingMessage, RetrievalRequest, ToolExecutionSummary, ToolStatus, VerifiedDataBinding
 from ..models import configured_model, load_system_prompt
 from ..repositories import repository
