@@ -14,6 +14,11 @@ from uuid import uuid4
 import httpx
 
 TECHNICAL_TERMS = re.compile(r"\b(PENDING|CONFIRMED|PROCESSING|SHIPPED|OUT_FOR_DELIVERY|DELIVERED|CANCELLED|CAPTURED|AUTHORIZED|ToolResult|JSON)\b")
+OWNERSHIP_SAFE_TOOLS = {"get_shipping_status", "get_payment_status", "get_refund_status", "check_return_eligibility"}
+
+
+def missing_expected_tools(expected: list[str], actual: set[str]) -> list[str]:
+    return [name for name in expected if name not in actual and not (name == "get_order_details" and actual.intersection(OWNERSHIP_SAFE_TOOLS))]
 
 
 def expand_templates(path: Path) -> list[dict[str, Any]]:
@@ -78,7 +83,7 @@ async def run_case(client: httpx.AsyncClient, case: dict[str, Any], base_url: st
     tool_names = {item.get("name") for item in (done or {}).get("tool_calls", [])}
     if case.get("intentAnyOf") and intent not in case["intentAnyOf"]:
         errors.append("WRONG_INTENT")
-    missing_tools = [name for name in case.get("expectedTools", []) if name not in tool_names]
+    missing_tools = missing_expected_tools(case.get("expectedTools", []), tool_names)
     if missing_tools:
         errors.append("MISSING_TOOL")
     if any(name in tool_names for name in case.get("forbiddenTools", [])):

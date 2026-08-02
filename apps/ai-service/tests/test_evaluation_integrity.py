@@ -1,4 +1,6 @@
 import unittest
+
+from app.evaluation_live import missing_expected_tools
 import ast
 import json
 from difflib import SequenceMatcher
@@ -6,6 +8,9 @@ from pathlib import Path
 
 
 class EvaluationIntegrityTests(unittest.TestCase):
+    def test_ownership_safe_tool_satisfies_legacy_order_detail_expectation(self):
+        self.assertEqual(missing_expected_tools(["get_order_details", "get_shipping_status"], {"get_shipping_status"}), [])
+
     def test_only_one_production_agent_runtime_exists(self):
         app_dir = Path(__file__).parents[1] / "app"
         self.assertFalse((app_dir / "agent.py").exists())

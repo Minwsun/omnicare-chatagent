@@ -31,8 +31,8 @@ from ..tool_adapters import bind_tool_context
 from .confirmation import create_confirmation_token
 from .context import TrustedContext
 from .registry import ToolRegistry, tool_registry
-from .runtime import STATUS_LABELS, classify, format_datetime, format_money, normalize_order_id, normalize_support_text
-from ..tools import find_eligible_orders as find_eligible_orders_impl, get_shipping_status as get_shipping_status_impl
+from .runtime import PAYMENT_LABELS, REFUND_LABELS, STATUS_LABELS, classify, format_datetime, format_money, normalize_order_id, normalize_support_text
+from ..tools import find_eligible_orders as find_eligible_orders_impl, get_payment_status as get_payment_status_impl, get_refund_status as get_refund_status_impl, get_shipping_status as get_shipping_status_impl
 from .supervisor import SupervisorHarness
 
 
@@ -152,6 +152,8 @@ class LangChainAgentRuntime:
             return await self._run_product_discovery(message, context)
         if self._semantic_intent(message) == "ORDER_TRACKING":
             return await self._run_order_tracking_fast(message, context)
+        if self._semantic_intent(message) in {"PAYMENT_STATUS", "REFUND_STATUS"}:
+            return await self._run_transaction_status_fast(message, context, self._semantic_intent(message))
         runtime_context = await self._load_runtime_context(message)
         config = {"configurable": {"thread_id": message.conversation_id}}
         with bind_tool_context(context.tool_context()):
@@ -174,6 +176,14 @@ class LangChainAgentRuntime:
         if self._semantic_intent(message) == "ORDER_TRACKING":
             yield "tool_started", {"tools": ["get_shipping_status" if normalize_order_id(message.content, message.page_context) else "find_eligible_orders"]}
             response = await self._run_order_tracking_fast(message, context)
+            yield "tool_completed", {"tools": [call.name for call in response.tool_calls]}
+            yield "token", response.answer
+            yield "done", response
+            return
+        if self._semantic_intent(message) in {"PAYMENT_STATUS", "REFUND_STATUS"}:
+            intent = self._semantic_intent(message)
+            yield "tool_started", {"tools": ["get_payment_status" if intent == "PAYMENT_STATUS" else "get_refund_status"]}
+            response = await self._run_transaction_status_fast(message, context, intent)
             yield "tool_completed", {"tools": [call.name for call in response.tool_calls]}
             yield "token", response.answer
             yield "done", response
@@ -324,8 +334,21 @@ class LangChainAgentRuntime:
         status = STATUS_LABELS.get(str(data.get("status")), str(data.get("status") or "đang được vận chuyển"))
         eta = format_datetime(data.get("estimatedDelivery"))
         carrier = str(data.get("carrier") or "đơn vị vận chuyển")
+        normalized = normalize_support_text(message.content)
+        delivery_dispute = any(term in normalized for term in ("chưa nhận", "không thấy", "giao nhầm", "giao cho ai"))
+        if str(data.get("status")) == "DELIVERED" and delivery_dispute:
+            return GroundedAgentResponse(
+                answer=f"Đơn {order_id} đang được ghi nhận đã giao qua {carrier}, nhưng dữ liệu hiện có không cho biết chính xác ai đã nhận hoặc điểm giao chi tiết. Bạn kiểm tra với người thân, lễ tân hoặc bảo vệ; nếu vẫn chưa thấy hàng, mình sẽ chuyển yêu cầu tra soát giao hàng cho nhân viên hỗ trợ.",
+                confidence=1,
+                intent="ORDER_TRACKING",
+                goal="DELIVERED_NOT_RECEIVED",
+                resolved_context={"orderId": order_id, "deliveryIssue": "DELIVERED_NOT_RECEIVED"},
+                requires_human=True,
+                escalation_reason="DELIVERED_NOT_RECEIVED",
+                tool_calls=[ToolExecutionSummary(name="get_shipping_status", status=shipping.status, reference_id=order_id)],
+            )
         answer = f"Đơn {order_id} hiện {status} qua {carrier}."
-        if eta:
+        if eta and str(data.get("status")) != "DELIVERED":
             answer += f" Dự kiến giao trước {eta}."
         return GroundedAgentResponse(
             answer=answer,
@@ -335,6 +358,45 @@ class LangChainAgentRuntime:
             resolved_context={"orderId": order_id},
             tool_calls=[ToolExecutionSummary(name="get_shipping_status", status=shipping.status, reference_id=order_id)],
         )
+
+    async def _run_transaction_status_fast(self, message: IncomingMessage, context: TrustedContext, intent: str) -> GroundedAgentResponse:
+        order_id = normalize_order_id(message.content, message.page_context)
+        goal = "PAYMENT_RELEVANT" if intent == "PAYMENT_STATUS" else "REFUND_RELEVANT"
+        tool_name = "get_payment_status" if intent == "PAYMENT_STATUS" else "get_refund_status"
+        if not order_id:
+            result = await find_eligible_orders_impl(context.tool_context(), goal)
+            payload = result.model_dump(mode="json")
+            orders = (result.data or {}).get("orders", []) if result.status == ToolStatus.SUCCESS else []
+            if len(orders) == 1:
+                order_id = str(orders[0]["id"])
+            elif len(orders) > 1:
+                return GroundedAgentResponse(
+                    answer="Mình đã tìm thấy nhiều đơn phù hợp. Bạn chọn đúng đơn bên dưới để mình kiểm tra giao dịch mới nhất nhé.",
+                    confidence=1,
+                    intent=intent,
+                    goal=intent,
+                    tool_calls=[ToolExecutionSummary(name="find_eligible_orders", status=result.status)],
+                    ui=self._order_selector(message, [("find_eligible_orders", payload)], intent),
+                    conversation_state="AWAITING_INPUT",
+                    resolution_status="NEEDS_INPUT",
+                )
+            else:
+                return GroundedAgentResponse(answer=result.safe_message or "Mình chưa tìm thấy đơn phù hợp trong tài khoản.", confidence=0.8, intent=intent, goal=intent, tool_calls=[ToolExecutionSummary(name="find_eligible_orders", status=result.status)])
+        result = await (get_payment_status_impl(context.tool_context(), order_id) if intent == "PAYMENT_STATUS" else get_refund_status_impl(context.tool_context(), order_id))
+        if result.status == ToolStatus.FORBIDDEN:
+            return GroundedAgentResponse(answer=result.safe_message or "Mình không thể xác minh đơn hàng này trong tài khoản của bạn.", confidence=0.2, intent=intent, goal=intent, requires_human=True, escalation_reason=result.error_code or "ORDER_OWNERSHIP_VERIFICATION_FAILED", tool_calls=[ToolExecutionSummary(name=tool_name, status=result.status)])
+        if result.status != ToolStatus.SUCCESS:
+            return GroundedAgentResponse(answer=result.safe_message or "Mình chưa tìm thấy giao dịch phù hợp cho đơn này.", confidence=0.8, intent=intent, goal=intent, resolved_context={"orderId": order_id}, tool_calls=[ToolExecutionSummary(name=tool_name, status=result.status)])
+        data = result.data or {}
+        if intent == "PAYMENT_STATUS":
+            status = PAYMENT_LABELS.get(str(data.get("status")), "đang được kiểm tra")
+            amount = format_money(data.get("amount"), str(data.get("currency") or "VND"))
+            answer = f"Khoản thanh toán {amount} của đơn {order_id} hiện {status}."
+        else:
+            status = REFUND_LABELS.get(str(data.get("status")), "đang được kiểm tra")
+            amount = format_money(data.get("amount"), "VND")
+            answer = f"Yêu cầu hoàn tiền {amount} của đơn {order_id} hiện {status}."
+        return GroundedAgentResponse(answer=answer, confidence=1, intent=intent, goal=intent, resolved_context={"orderId": order_id}, tool_calls=[ToolExecutionSummary(name=tool_name, status=result.status, reference_id=order_id)])
 
     @staticmethod
     async def _load_runtime_context(message: IncomingMessage) -> SupportRuntimeContext:
