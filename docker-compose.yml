@@ -3,20 +3,20 @@ services:
     build: ./apps/web
     environment:
       AI_SERVICE_URL: http://ai-service:8000
-      DATABASE_URL: postgresql://db-user:db-password@postgres:5432/omnicare
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-omnicare}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     ports: ["3000:3000"]
     depends_on: [ai-service]
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_DB: <database-name>
-      POSTGRES_USER: <database-user>
-      POSTGRES_PASSWORD: <database-password>
+      POSTGRES_DB: ${POSTGRES_DB:-omnicare}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     ports: ["5432:5432"]
     volumes: ["postgres-data:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U omnicare -d omnicare"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -25,7 +25,7 @@ services:
       context: .
       dockerfile: apps/ai-service/Dockerfile
     environment:
-      DATABASE_URL: postgresql://db-user:db-password@postgres:5432/omnicare
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-omnicare}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-}

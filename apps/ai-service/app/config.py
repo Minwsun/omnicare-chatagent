@@ -2,7 +2,7 @@ import os
 
 
 class Settings:
-    database_url = os.getenv("DATABASE_URL", "postgresql://db-user:db-password@postgres:5432/omnicare")
+    database_url = os.getenv("DATABASE_URL", "")
     llm_base_url = os.getenv("LLM_BASE_URL")
     llm_api_key = os.getenv("LLM_API_KEY")
     llm_model = os.getenv("LLM_MODEL")

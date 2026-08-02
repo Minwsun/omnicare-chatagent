@@ -40,7 +40,7 @@ Dataset mặc định gồm 20 khách hàng, 60 đơn hàng, 408 knowledge docum
 
 ```powershell
 cd apps/web
-$env:DATABASE_URL='postgresql://db-user:db-password@localhost:5432/omnicare'
+$env:DATABASE_URL='<postgresql-connection-string>'
 npm run build
 npm run lint
 
