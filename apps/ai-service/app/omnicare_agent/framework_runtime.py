@@ -32,7 +32,7 @@ from .confirmation import create_confirmation_token
 from .context import TrustedContext
 from .registry import ToolRegistry, tool_registry
 from .runtime import PAYMENT_LABELS, REFUND_LABELS, STATUS_LABELS, classify, format_datetime, format_money, normalize_order_id, normalize_support_text
-from ..tools import find_eligible_orders as find_eligible_orders_impl, get_payment_status as get_payment_status_impl, get_refund_status as get_refund_status_impl, get_shipping_status as get_shipping_status_impl
+from ..tools import find_eligible_orders as find_eligible_orders_impl, get_order_details as get_order_details_impl, get_payment_status as get_payment_status_impl, get_refund_status as get_refund_status_impl, get_shipping_status as get_shipping_status_impl
 from .supervisor import SupervisorHarness
 
 
@@ -152,6 +152,8 @@ class LangChainAgentRuntime:
             return await self._run_product_discovery(message, context)
         if self._semantic_intent(message) == "ORDER_TRACKING":
             return await self._run_order_tracking_fast(message, context)
+        if self._semantic_intent(message) == "ORDER_CANCELLATION":
+            return await self._run_order_cancellation_fast(message, context)
         if self._semantic_intent(message) in {"PAYMENT_STATUS", "REFUND_STATUS"}:
             return await self._run_transaction_status_fast(message, context, self._semantic_intent(message))
         runtime_context = await self._load_runtime_context(message)
@@ -176,6 +178,13 @@ class LangChainAgentRuntime:
         if self._semantic_intent(message) == "ORDER_TRACKING":
             yield "tool_started", {"tools": ["get_shipping_status" if normalize_order_id(message.content, message.page_context) else "find_eligible_orders"]}
             response = await self._run_order_tracking_fast(message, context)
+            yield "tool_completed", {"tools": [call.name for call in response.tool_calls]}
+            yield "token", response.answer
+            yield "done", response
+            return
+        if self._semantic_intent(message) == "ORDER_CANCELLATION":
+            yield "tool_started", {"tools": ["get_order_details" if normalize_order_id(message.content, message.page_context) else "find_eligible_orders"]}
+            response = await self._run_order_cancellation_fast(message, context)
             yield "tool_completed", {"tools": [call.name for call in response.tool_calls]}
             yield "token", response.answer
             yield "done", response
@@ -233,6 +242,13 @@ class LangChainAgentRuntime:
         prepared = await self.supervisor.prepare(message)
         route = prepared["route"]
         plan = prepared["plan"]
+        deterministic_intent = classify(message.content)
+        routed_intent = str(route.primary_intent)
+        policy_intents = {"RETURN_POLICY", "REFUND_POLICY", "PAYMENT_POLICY", "SHIPPING_POLICY", "PRIVACY", "ACCOUNT_SECURITY", "FRAUD_WARNING", "TECHNICAL_SUPPORT", "VOUCHER"}
+        if deterministic_intent in policy_intents and not normalize_order_id(message.content, message.page_context):
+            route.primary_intent = deterministic_intent
+        elif routed_intent == "PRODUCT_DISCOVERY" and deterministic_intent != "PRODUCT_DISCOVERY":
+            route.primary_intent = deterministic_intent
         message.page_context = {
             **(message.page_context or {}),
             "semanticRoute": route.model_dump(mode="json"),
@@ -397,6 +413,73 @@ class LangChainAgentRuntime:
             amount = format_money(data.get("amount"), "VND")
             answer = f"Yêu cầu hoàn tiền {amount} của đơn {order_id} hiện {status}."
         return GroundedAgentResponse(answer=answer, confidence=1, intent=intent, goal=intent, resolved_context={"orderId": order_id}, tool_calls=[ToolExecutionSummary(name=tool_name, status=result.status, reference_id=order_id)])
+
+    async def _run_order_cancellation_fast(self, message: IncomingMessage, context: TrustedContext) -> GroundedAgentResponse:
+        order_id = normalize_order_id(message.content, message.page_context)
+        if not order_id:
+            result = await find_eligible_orders_impl(context.tool_context(), "CANCELLABLE")
+            payload = result.model_dump(mode="json")
+            orders = (result.data or {}).get("orders", []) if result.status == ToolStatus.SUCCESS else []
+            if len(orders) == 1:
+                order_id = str(orders[0]["id"])
+            elif len(orders) > 1:
+                return GroundedAgentResponse(
+                    answer=f"Tài khoản của bạn có {len(orders)} đơn còn có thể yêu cầu hủy. Bạn chọn một đơn bên dưới để tiếp tục nhé.",
+                    confidence=1,
+                    intent="ORDER_CANCELLATION",
+                    goal="ORDER_CANCELLATION",
+                    tool_calls=[ToolExecutionSummary(name="find_eligible_orders", status=result.status)],
+                    ui=self._order_selector(message, [("find_eligible_orders", payload)], "ORDER_CANCELLATION"),
+                    conversation_state="AWAITING_INPUT",
+                    resolution_status="NEEDS_INPUT",
+                )
+            else:
+                return GroundedAgentResponse(
+                    answer=result.safe_message or "Tài khoản của bạn hiện không có đơn nào còn có thể hủy.",
+                    confidence=1,
+                    intent="ORDER_CANCELLATION",
+                    goal="ORDER_CANCELLATION",
+                    tool_calls=[ToolExecutionSummary(name="find_eligible_orders", status=result.status)],
+                )
+        result = await get_order_details_impl(context.tool_context(), order_id)
+        summary = ToolExecutionSummary(name="get_order_details", status=result.status, reference_id=order_id)
+        if result.status == ToolStatus.FORBIDDEN:
+            return GroundedAgentResponse(
+                answer=f"Mình không thể xác minh đơn {order_id} trong tài khoản của bạn. Hãy kiểm tra lại mã đơn hoặc chọn đơn từ lịch sử mua hàng.",
+                confidence=0.2,
+                intent="ORDER_CANCELLATION",
+                goal="ORDER_CANCELLATION",
+                requires_human=True,
+                escalation_reason=result.error_code or "ORDER_OWNERSHIP_VERIFICATION_FAILED",
+                tool_calls=[summary],
+            )
+        if result.status != ToolStatus.SUCCESS:
+            return GroundedAgentResponse(answer=result.safe_message or f"Mình chưa kiểm tra được đơn {order_id}.", confidence=0.5, intent="ORDER_CANCELLATION", goal="ORDER_CANCELLATION", tool_calls=[summary])
+        data = result.data or {}
+        raw_status = str(data.get("status") or "")
+        status = STATUS_LABELS.get(raw_status, "đang được xử lý")
+        if raw_status not in {"PENDING", "CONFIRMED", "PROCESSING"}:
+            return GroundedAgentResponse(
+                answer=f"Đơn {order_id} hiện {status}, nên không thể hủy ở giai đoạn này. Nếu hàng có vấn đề, mình có thể hỗ trợ kiểm tra đổi trả sau khi nhận hàng.",
+                confidence=1,
+                intent="ORDER_CANCELLATION",
+                goal="ORDER_CANCELLATION",
+                resolved_context={"orderId": order_id},
+                tool_calls=[summary],
+            )
+        output = SupportAgentOutput(answer="Đơn có thể yêu cầu hủy.", intent="ORDER_CANCELLATION", requested_action="CANCEL_ORDER", requested_order_id=order_id)
+        confirmation = self._confirmation(message, output)
+        return GroundedAgentResponse(
+            answer=f"Đơn {order_id} hiện {status} và vẫn có thể gửi yêu cầu hủy. Đơn chưa bị thay đổi; bạn chọn “Đồng ý hủy” bên dưới nếu muốn tiếp tục.",
+            confidence=1,
+            intent="ORDER_CANCELLATION",
+            goal="ORDER_CANCELLATION",
+            resolved_context={"orderId": order_id},
+            tool_calls=[summary],
+            ui=[confirmation] if confirmation else [],
+            conversation_state="AWAITING_CONFIRMATION",
+            resolution_status="READY_FOR_CONFIRMATION",
+        )
 
     @staticmethod
     async def _load_runtime_context(message: IncomingMessage) -> SupportRuntimeContext:
@@ -742,7 +825,7 @@ class LangChainAgentRuntime:
 
     @staticmethod
     async def _ensure_grounded_citations(message: IncomingMessage, response: GroundedAgentResponse) -> GroundedAgentResponse:
-        if response.citations or response.requires_human or response.intent not in {None, "KNOWLEDGE", "RETURN_POLICY", "REFUND_POLICY", "PAYMENT_POLICY", "SHIPPING_POLICY", "VOUCHER", "PRIVACY", "ACCOUNT_SECURITY", "TECHNICAL_SUPPORT"}:
+        if response.citations or response.requires_human or response.intent not in {None, "KNOWLEDGE", "RETURN_POLICY", "REFUND_POLICY", "PAYMENT_POLICY", "SHIPPING_POLICY", "VOUCHER", "PRIVACY", "ACCOUNT_SECURITY", "FRAUD_WARNING", "TECHNICAL_SUPPORT"}:
             return response
         semantic_route = (message.page_context or {}).get("semanticRoute") or {}
         profile = response.intent or semantic_route.get("primary_intent")

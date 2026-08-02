@@ -140,6 +140,10 @@ def classify(content: str) -> str:
     discovery_terms = ("gợi ý", "tư vấn", "muốn mua", "tìm", "mua", "đặt")
     if any(product in text for product in product_terms) and any(term in text for term in discovery_terms):
         return "PRODUCT_DISCOVERY"
+    return_issue = any(term in text for term in ("trả hàng", "trả đơn", "đổi trả", "sai hàng", "sai sản phẩm", "nhận sai", "thiếu hàng", "thiếu sản phẩm", "thiếu món", "không giống mô tả", "bị hỏng", "hàng lỗi"))
+    product_failure = any(term in text for term in ("bị lỗi", "lỗi rồi")) and any(term in text for term in ("sản phẩm", "hàng", "ord"))
+    if return_issue or product_failure:
+        return "RETURN_ELIGIBILITY" if "ord" in text else "RETURN_POLICY"
     if any(term in text for term in ("hoàn tiền", "refund", "tiền hoàn", "tiền về chưa", "yêu cầu hoàn")):
         return "REFUND_STATUS" if "ord" in text else "REFUND_POLICY"
     if any(term in text for term in ("thanh toán", "trừ tiền", "trả tiền", "tiền đơn", "cod", "thẻ")):
@@ -148,8 +152,8 @@ def classify(content: str) -> str:
         return "ORDER_TRACKING"
     if any(term in text for term in ("app", "ứng dụng", "thông báo", "bộ nhớ", "cập nhật")):
         return "TECHNICAL_SUPPORT"
-    if any(term in text for term in ("trả hàng", "trả đơn", "đổi trả", "sai hàng", "sai sản phẩm", "nhận sai", "thiếu món", "không giống mô tả", "bị hỏng", "bị lỗi", "lỗi rồi", "hàng lỗi")):
-        return "RETURN_ELIGIBILITY" if "ord" in text else "RETURN_POLICY"
+    if any(term in text for term in ("địa chỉ sau khi đặt", "đổi địa chỉ", "chính sách vận chuyển", "hỏi giao", "liên hệ đơn vị vận chuyển")):
+        return "SHIPPING_POLICY"
     commerce_actions = ("đặt đơn", "tạo đơn", "mua hàng", "mua ngay", "chốt mua", "đặt hàng", "đặt sản phẩm")
     if any(term in text for term in commerce_actions) or fuzzy_phrase(text, commerce_actions):
         return "PRODUCT_DISCOVERY"

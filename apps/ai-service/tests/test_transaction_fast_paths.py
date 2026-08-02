@@ -38,6 +38,25 @@ class TransactionFastPathTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("PROCESSING", response.answer)
         self.assertIn("hoàn tiền", response.answer)
 
+    async def test_cancellation_fast_path_returns_confirmation(self):
+        runtime = object.__new__(LangChainAgentRuntime)
+        message = IncomingMessage(message_id="m4", content="Hủy ORD-1019 giúp mình", customer_id="customer_001", conversation_id="c4")
+        result = SimpleNamespace(status=ToolStatus.SUCCESS, data={"id": "ORD-1019", "status": "CONFIRMED"})
+        with patch("app.omnicare_agent.framework_runtime.get_order_details_impl", AsyncMock(return_value=result)):
+            response = await runtime._run_order_cancellation_fast(message, TrustedContext.from_message(message))
+        self.assertEqual([call.name for call in response.tool_calls], ["get_order_details"])
+        self.assertEqual(response.ui[0].type, "CONFIRMATION")
+        self.assertEqual(response.resolution_status, "READY_FOR_CONFIRMATION")
+
+    async def test_cancellation_fast_path_rejects_shipped_order(self):
+        runtime = object.__new__(LangChainAgentRuntime)
+        message = IncomingMessage(message_id="m5", content="Hủy ORD-1003", customer_id="customer_001", conversation_id="c5")
+        result = SimpleNamespace(status=ToolStatus.SUCCESS, data={"id": "ORD-1003", "status": "SHIPPED"})
+        with patch("app.omnicare_agent.framework_runtime.get_order_details_impl", AsyncMock(return_value=result)):
+            response = await runtime._run_order_cancellation_fast(message, TrustedContext.from_message(message))
+        self.assertFalse(response.ui)
+        self.assertIn("không thể hủy", response.answer)
+
 
 if __name__ == "__main__":
     unittest.main()
