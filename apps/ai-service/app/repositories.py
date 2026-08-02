@@ -360,6 +360,22 @@ class Repository:
         ''', ticket_id, customer_id, order_id, conversation_id, priority, category, summary)
         return ticket_id
 
+    async def ticket_exists(self, ticket_id: str) -> bool:
+        await self.connect()
+        return bool(await self.pool.fetchval('SELECT EXISTS(SELECT 1 FROM "Ticket" WHERE id=$1)', ticket_id))
+
+    async def create_handoff_ticket(self, ticket_id: str, customer_id: Optional[str], conversation_id: str, order_id: Optional[str], category: str, summary: str, priority: str, context: Dict[str, Any]) -> str:
+        await self.connect()
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                await connection.execute('''
+                    INSERT INTO "Ticket" (id, "customerId", "orderId", "conversationId", status, priority, category, summary, "createdAt", "updatedAt")
+                    VALUES ($1,$2,$3,$4,'NEED_HUMAN',$5::"Priority",$6,$7,now(),now())
+                    ON CONFLICT (id) DO UPDATE SET "updatedAt"=now()
+                ''', ticket_id, customer_id, order_id, conversation_id, priority, category, summary[:1000])
+                await connection.execute('INSERT INTO "TicketEvent" (id,"ticketId",type,payload,"createdAt") VALUES ($1,$2,\'AI_HANDOFF\',$3::jsonb,now())', f"te_{uuid4().hex}", ticket_id, json.dumps(context, ensure_ascii=False, default=str))
+        return ticket_id
+
     async def record_knowledge_gap(self, query: str, reason: str) -> str:
         await self.connect()
         row = await self.pool.fetchrow('''

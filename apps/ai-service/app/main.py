@@ -27,6 +27,7 @@ from .repositories import repository
 from .retrieval import clear_retrieval_cache, retrieve
 from .tools import cancel_order, confirm_checkout, create_checkout_session, get_customer_addresses, get_order_details, quote_checkout, update_checkout
 from .graphrag_worker import GraphRagWorker
+from .triage import TriageResult, triage_request
 
 logger = logging.getLogger(__name__)
 background_tasks: set[asyncio.Task] = set()
@@ -43,6 +44,48 @@ async def persist_trace_safely(**payload) -> None:
         await repository.persist_ai_trace(**payload)
     except Exception:
         logger.exception("AI trace batch persist failed")
+
+
+def apply_triage(response: GroundedAgentResponse, triage: TriageResult) -> GroundedAgentResponse:
+    response.category = triage.category
+    response.priority = triage.priority
+    response.priority_reasons = triage.priority_reasons
+    response.request_fingerprint = triage.request_fingerprint
+    if triage.requires_human:
+        response.requires_human = True
+        response.escalation_reason = response.escalation_reason or triage.escalation_reason
+        response.resolution_status = "HANDOFF"
+        response.case_state = "HANDOFF"
+    return response
+
+
+async def ensure_handoff(message: IncomingMessage, response: GroundedAgentResponse, triage: TriageResult) -> None:
+    if not response.requires_human:
+        return
+    ticket_id = f"TCK-{triage.request_fingerprint}"
+    duplicate = await repository.ticket_exists(ticket_id)
+    await repository.create_handoff_ticket(
+        ticket_id,
+        message.customer_id,
+        message.conversation_id,
+        triage.order_id,
+        triage.category,
+        response.answer,
+        triage.priority,
+        {
+            "requestFingerprint": triage.request_fingerprint,
+            "duplicate": duplicate,
+            "intent": response.intent,
+            "confidence": response.confidence,
+            "escalationReason": response.escalation_reason,
+            "missingFacts": response.missing_facts,
+            "citations": [item.model_dump(mode="json") for item in response.citations],
+            "toolCalls": [item.model_dump(mode="json") for item in response.tool_calls],
+            "resolvedContext": response.resolved_context,
+        },
+    )
+    if duplicate:
+        response.duplicate_of = ticket_id
 
 
 class VisionImage(BaseModel):
@@ -184,7 +227,12 @@ async def vision_analyze(request: VisionAnalyzeRequest) -> list[VisionAnalysis]:
 @app.post("/agent/run", response_model=GroundedAgentResponse)
 async def agent_run(message: IncomingMessage) -> GroundedAgentResponse:
     try:
-        return await agent_runtime().run(message)
+        triage = triage_request(message.content, message.customer_id)
+        if triage.is_spam:
+            return apply_triage(GroundedAgentResponse(answer="Mình chỉ hỗ trợ các vấn đề liên quan đến tài khoản, đơn hàng, thanh toán, sản phẩm và dịch vụ Omni.", confidence=1, intent="SPAM", conversation_mode="OUT_OF_SCOPE"), triage)
+        response = apply_triage(await agent_runtime().run(message), triage)
+        await ensure_handoff(message, response, triage)
+        return response
     except LLMUnavailableError as error:
         raise HTTPException(status_code=503, detail="LLM_PROVIDER_UNAVAILABLE") from error
     except Exception as error:
@@ -202,6 +250,13 @@ async def agent_stream(message: IncomingMessage) -> StreamingResponse:
         yield f"event: accepted\ndata: {json.dumps({'messageId': message.message_id, 'runId': run_id})}\n\n"
         yield progress_event("UNDERSTANDING", "Đang tìm hiểu yêu cầu của bạn…")
         try:
+            triage = triage_request(message.content, message.customer_id)
+            if triage.is_spam:
+                response = apply_triage(GroundedAgentResponse(answer="Mình chỉ hỗ trợ các vấn đề liên quan đến tài khoản, đơn hàng, thanh toán, sản phẩm và dịch vụ Omni.", confidence=1, intent="SPAM", conversation_mode="OUT_OF_SCOPE", run_id=run_id), triage)
+                yield f"event: token\ndata: {json.dumps({'token': response.answer}, ensure_ascii=False)}\n\n"
+                yield f"event: metrics\ndata: {json.dumps({'ttftMs': 0, 'totalMs': round((time.perf_counter() - started_at) * 1000)}, ensure_ascii=False)}\n\n"
+                yield f"event: done\ndata: {response.model_dump_json()}\n\n"
+                return
             first_token_ms = None
             async for event_type, payload in agent_runtime().stream(message):
                 if event_type == "planning":
@@ -232,7 +287,8 @@ async def agent_stream(message: IncomingMessage) -> StreamingResponse:
                 if event_type != "done":
                     yield f"event: {event_type}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
                     continue
-                response = payload
+                response = apply_triage(payload, triage)
+                await ensure_handoff(message, response, triage)
                 response.run_id = run_id
                 if response.resolved_context:
                     yield f"event: context_resolved\ndata: {json.dumps(response.resolved_context, ensure_ascii=False)}\n\n"

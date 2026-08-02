@@ -214,6 +214,11 @@ class GroundedAgentResponse(BaseModel):
     escalation_reason: Optional[str] = None
     run_id: Optional[str] = None
     review_status: Literal["PASSED", "REWRITE", "FALLBACK", "HANDOFF"] = "PASSED"
+    category: Optional[str] = None
+    priority: Literal["LOW", "MEDIUM", "HIGH", "URGENT"] = "LOW"
+    priority_reasons: List[str] = Field(default_factory=list)
+    request_fingerprint: Optional[str] = None
+    duplicate_of: Optional[str] = None
 
 
 class RetrievalRequest(BaseModel):
