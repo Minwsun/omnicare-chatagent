@@ -40,7 +40,10 @@ class AdminAssistRequest(BaseModel):
     summary: str
     customer: dict | None = None
     order: dict | None = None
-    conversation: str = ""
+    conversation: list[dict] = Field(default_factory=list)
+    memory: dict | None = None
+    evidence: list[dict] = Field(default_factory=list)
+    context_version: str | None = None
 
 
 def schedule_background(coro) -> None:
@@ -240,9 +243,11 @@ async def vision_analyze(request: VisionAnalyzeRequest) -> list[VisionAnalysis]:
 @app.post("/admin/assist")
 async def admin_assist(request: AdminAssistRequest) -> dict:
     system = (
-        "Bạn là copilot cho nhân viên chăm sóc khách hàng Omni. Chỉ dùng dữ kiện được cung cấp; không tự tạo trạng thái giao dịch. "
+        "Bạn là copilot cho nhân viên chăm sóc khách hàng Omni. "
+        "Bạn đang hỗ trợ nhân viên tiếp tục đúng cuộc trò chuyện khách vừa trao đổi với Omni AI. "
+        "Ưu tiên câu khách mới nhất, không chào lại, không hỏi lại dữ kiện đã có. Chỉ dùng dữ kiện được cung cấp; không tự tạo trạng thái giao dịch. "
         "Trả JSON gồm summary, missing_information, next_action, reply_options, warnings. "
-        "reply_options có 2-4 câu trả lời tiếng Việt tự nhiên, ngắn, không hứa điều chưa xác minh."
+        "reply_options có 3 câu trả lời tiếng Việt: tự nhiên và đồng cảm; ngắn gọn; hỏi đúng thông tin còn thiếu. Không hứa điều chưa xác minh."
     )
     context = request.model_dump_json(exclude_none=True)
     try:
@@ -257,6 +262,7 @@ async def admin_assist(request: AdminAssistRequest) -> dict:
             "next_action": str(payload.get("next_action") or "Kiểm tra thông tin và phản hồi khách hàng."),
             "reply_options": [str(item) for item in payload.get("reply_options", [])][:4],
             "warnings": [str(item) for item in payload.get("warnings", [])][:8],
+            "contextVersion": request.context_version,
         }
     except LLMUnavailableError as error:
         raise HTTPException(status_code=503, detail="LLM_PROVIDER_UNAVAILABLE") from error

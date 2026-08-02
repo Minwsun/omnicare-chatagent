@@ -78,12 +78,8 @@ export async function POST(request: Request) {
     if (activeTicket.status === "PENDING_CUSTOMER") {
       await prisma.ticket.update({ where: { id: activeTicket.id }, data: { status: "NEED_HUMAN" } });
     }
-    const answer = activeTicket.assignedTo
-      ? "Mình đã gửi tin nhắn này tới nhân viên đang hỗ trợ bạn."
-      : "Mình đã cập nhật thông tin. Yêu cầu của bạn đang chờ nhân viên tiếp nhận.";
-    await prisma.message.create({ data: { conversationId, direction: "OUTBOUND", content: answer, metadata: { source: "SYSTEM", requires_human: true, ticketId: activeTicket.id } } });
     const handoff = publicHandoffState({ ...activeTicket, status: activeTicket.status === "PENDING_CUSTOMER" ? "NEED_HUMAN" : activeTicket.status });
-    const body = `event: done\ndata: ${JSON.stringify({ answer, confidence: 1, requires_human: true, handoff, citations: [], tool_calls: [], ui: [] })}\n\n`;
+    const body = `event: done\ndata: ${JSON.stringify({ answer: "", confidence: 1, requires_human: true, handoff, citations: [], tool_calls: [], ui: [] })}\n\n`;
     return new Response(body, { headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", "x-conversation-id": conversationId } });
   }
 

@@ -7,7 +7,7 @@ import AgentUiRenderer, { type UiComponent } from "@/components/agent-ui-rendere
 
 type Citation = { title: string; version: string; public_url?: string };
 type Attachment = { id:string; fileName:string; mimeType:string; size:number; url:string };
-type Message = { role: "customer" | "agent"; content: string; citations?: Citation[]; handoff?: boolean; ui?: UiComponent[]; attachments?: Attachment[] };
+type Message = { role: "customer" | "agent"; source?: "OMNI_AI" | "HUMAN_ADMIN" | "SYSTEM"; content: string; citations?: Citation[]; handoff?: boolean; ui?: UiComponent[]; attachments?: Attachment[] };
 type OrderChoice = { order_id: string; status: string; placed_at: string; total_amount: number; currency: string };
 type Conversation = { id: string; title: string | null; lastMessageAt: string; _count: { messages: number } };
 type Handoff = { ticketId:string; status:string; priority:string; category:string; assigned:boolean; mode:"WAITING_HUMAN"|"HUMAN_ACTIVE"|"WAITING_CUSTOMER"; updatedAt:string };
@@ -60,8 +60,6 @@ export default function ChatWidget() {
     });
   }, []);
 
-  if (pathname.startsWith("/admin")) return null;
-
   async function newConversation() {
     if (handoff && !window.confirm("Yêu cầu hỗ trợ người thật vẫn đang mở. Bạn vẫn muốn tạo cuộc trò chuyện mới?")) return;
     if (conversationId) await fetch(`/api/chat/conversations/${conversationId}/close`, { method: "POST" });
@@ -78,23 +76,10 @@ export default function ChatWidget() {
     if (!response.ok) return;
     const data = await response.json();
     setConversationId(id);
-    setMessages(data.conversation.messages.map((message: { direction: "INBOUND" | "OUTBOUND"; content: string; attachments?: Omit<Attachment,"url">[]; metadata?: { citations?: Citation[]; requires_human?: boolean; ui?: UiComponent[] } }) => ({ role: message.direction === "INBOUND" ? "customer" : "agent", content: message.content, citations: message.metadata?.citations, handoff: message.metadata?.requires_human, ui: message.metadata?.ui, attachments:message.attachments?.map((item)=>({...item,url:`/api/chat/attachments/${item.id}`})) })));
+    setMessages(data.conversation.messages.map((message: { direction: "INBOUND" | "OUTBOUND"; content: string; attachments?: Omit<Attachment,"url">[]; metadata?: { source?: "OMNI_AI" | "HUMAN_ADMIN" | "SYSTEM"; citations?: Citation[]; requires_human?: boolean; ui?: UiComponent[] } }) => ({ role: message.direction === "INBOUND" ? "customer" : "agent", source: message.metadata?.source ?? (message.direction === "OUTBOUND" ? "OMNI_AI" : undefined), content: message.content, citations: message.metadata?.citations, handoff: message.metadata?.requires_human, ui: message.metadata?.ui, attachments:message.attachments?.map((item)=>({...item,url:`/api/chat/attachments/${item.id}`})) })));
     const handoffResponse = await fetch(`/api/chat/handoff?conversationId=${id}`, { cache: "no-store" });
     if (handoffResponse.ok) setHandoff((await handoffResponse.json()).handoff);
     setHistoryOpen(false);
-  }
-
-  async function requestHuman() {
-    if (!window.confirm("Chuyển cuộc trò chuyện này cho nhân viên hỗ trợ?")) return;
-    let activeId = conversationId;
-    if (!activeId) {
-      const created = await fetch("/api/chat/conversations", { method: "POST" });
-      if (!created.ok) return;
-      activeId = (await created.json()).conversation.id;
-      setConversationId(activeId);
-    }
-    const response = await fetch("/api/chat/handoff", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId: activeId, reason: "Khách hàng chủ động yêu cầu gặp nhân viên" }) });
-    if (response.ok) setHandoff((await response.json()).handoff);
   }
 
   async function cancelHandoff() {
@@ -225,6 +210,8 @@ export default function ChatWidget() {
     }
   }
 
+  if (pathname.startsWith("/admin")) return null;
+
   return <div className="chat-widget">
     {open && <section className="chat-popup">
       <header className="widget-head"><div><b>OmniCare AI</b><small>{orderId ? `Đang hỗ trợ đơn ${orderId}` : authenticated ? "Hỗ trợ tài khoản và đơn hàng" : "Đăng nhập để tra cứu giao dịch"}</small></div><div><button onClick={() => setHistoryOpen((value) => !value)} title="Lịch sử">☰</button><button onClick={() => setOpen(false)} title="Thu gọn">×</button></div></header>
@@ -232,12 +219,11 @@ export default function ChatWidget() {
         <div className="widget-messages">
           {messages.length === 0 && <p className="widget-empty">{orderId ? `Hỏi về giao hàng, thanh toán, hủy hoặc trả đơn ${orderId}.` : "Hỏi về đơn hàng, thanh toán, giao hàng hoặc chính sách."}</p>}
           {orderId && messages.length === 0 && <div className="chat-quick-actions"><button onClick={() => setInput("Đơn này đang ở đâu?")}>Theo dõi đơn</button><button onClick={() => setInput("Đơn này có thể hủy không?")}>Kiểm tra hủy đơn</button><button onClick={() => setInput("Đơn này có thể trả hàng không?")}>Kiểm tra trả hàng</button></div>}
-          {messages.map((message, index) => message.content && <div key={index} className={`message ${message.role}`}><p>{message.content}</p>{message.attachments?.length?<div className="chat-attachments">{message.attachments.map((item)=><a href={item.url} target="_blank" rel="noreferrer" key={item.id}><img src={item.url} alt={item.fileName}/></a>)}</div>:null}{message.citations?.map((citation) => citation.public_url && <Link className="citation" href={citation.public_url} key={`${citation.title}-${citation.version}`}>Nguồn: {citation.title}</Link>)}{message.ui?.map((component) => <AgentUiRenderer key={component.id} component={component} disabled={loading} onSubmit={submitInteraction} />)}{message.handoff && <span className="handoff">Cần nhân viên hỗ trợ</span>}</div>)}
+          {messages.map((message, index) => message.content && <div key={index} className={`message ${message.role} ${message.source?.toLowerCase() ?? ""}`}><small>{message.role === "customer" ? "Bạn" : message.source === "HUMAN_ADMIN" ? "Nhân viên Omni" : message.source === "SYSTEM" ? "Hệ thống" : "Omni AI"}</small><p>{message.content}</p>{message.attachments?.length?<div className="chat-attachments">{message.attachments.map((item)=><a href={item.url} target="_blank" rel="noreferrer" key={item.id}><img src={item.url} alt={item.fileName}/></a>)}</div>:null}{message.citations?.map((citation) => citation.public_url && <Link className="citation" href={citation.public_url} key={`${citation.title}-${citation.version}`}>Nguồn: {citation.title}</Link>)}{message.ui?.map((component) => <AgentUiRenderer key={component.id} component={component} disabled={loading} onSubmit={submitInteraction} />)}{message.handoff && <span className="handoff">Cần nhân viên hỗ trợ</span>}</div>)}
           {handoff && <div className={`handoff-card ${handoff.mode.toLowerCase()}`}><b>{handoff.mode === "HUMAN_ACTIVE" ? "Nhân viên đã tham gia" : handoff.mode === "WAITING_CUSTOMER" ? "Đang chờ bạn bổ sung" : "Đang chờ nhân viên"}</b><small>{handoff.ticketId} · {handoff.priority}</small>{handoff.mode === "WAITING_HUMAN" && <button onClick={cancelHandoff}>Hủy yêu cầu</button>}</div>}
           {progress && <div className="agent-progress" role="status" aria-live="polite" aria-atomic="true"><span aria-hidden="true" /><p>{progress}</p></div>}
           {orderChoices.length > 0 && <div className="order-choices">{orderChoices.map((order) => <button key={order.order_id} onClick={() => setInput(`Kiểm tra đơn ${order.order_id}`)}><b>{order.order_id}</b><span>{order.status}</span><small>{order.total_amount.toLocaleString("vi-VN")} {order.currency}</small></button>)}</div>}
         </div>
-        {authenticated && <div className="human-action"><button type="button" onClick={requestHuman} disabled={Boolean(handoff)}>Gặp nhân viên</button></div>}
         {authenticated ? <><div className="attachment-drafts">{attachments.map((item)=><div key={item.id}><img src={item.url} alt={item.fileName}/><button type="button" onClick={()=>setAttachments((items)=>items.filter((candidate)=>candidate.id!==item.id))}>×</button></div>)}</div><form className="widget-form" onSubmit={send}><label className="attachment-button" title="Gửi ảnh kiện hàng">📎<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={selectImages} disabled={loading||uploading||attachments.length>=5}/></label><input value={input} onChange={(event) => setInput(event.target.value)} placeholder={orderId ? `Hỏi về ${orderId}` : "Nhập câu hỏi hoặc mã đơn"} /><button disabled={loading||uploading}>{uploading?"↑":loading ? "…" : "Gửi"}</button></form></> : <div className="widget-login"><Link href="/login">Đăng nhập để bắt đầu</Link></div>}
       </>}
     </section>}

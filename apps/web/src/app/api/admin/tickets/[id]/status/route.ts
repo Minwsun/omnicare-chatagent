@@ -21,6 +21,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     CLOSE: { status: "CLOSED" as const, assignedTo: admin.id, event: "CLOSED" },
     RELEASE_AI: { status: "RESOLVED" as const, assignedTo: null, event: "RELEASED_TO_AI" },
   }[parsed.data.action];
+  if (ticket.status === state.status && ticket.assignedTo === state.assignedTo) {
+    return NextResponse.json({ ticket });
+  }
   const updated = await prisma.ticket.update({ where: { id }, data: { status: state.status, assignedTo: state.assignedTo } });
   await addTicketEvent(id, state.event, { adminId: admin.id });
   return NextResponse.json({ ticket: updated });
