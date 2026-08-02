@@ -62,30 +62,33 @@ def apply_triage(response: GroundedAgentResponse, triage: TriageResult) -> Groun
 async def ensure_handoff(message: IncomingMessage, response: GroundedAgentResponse, triage: TriageResult) -> None:
     if not response.requires_human:
         return
-    ticket_id = f"TCK-{triage.request_fingerprint}"
-    duplicate = await repository.ticket_exists(ticket_id)
-    await repository.create_handoff_ticket(
-        ticket_id,
-        message.customer_id,
-        message.conversation_id,
-        triage.order_id,
-        triage.category,
-        response.answer,
-        triage.priority,
-        {
-            "requestFingerprint": triage.request_fingerprint,
-            "duplicate": duplicate,
-            "intent": response.intent,
-            "confidence": response.confidence,
-            "escalationReason": response.escalation_reason,
-            "missingFacts": response.missing_facts,
-            "citations": [item.model_dump(mode="json") for item in response.citations],
-            "toolCalls": [item.model_dump(mode="json") for item in response.tool_calls],
-            "resolvedContext": response.resolved_context,
-        },
-    )
-    if duplicate:
-        response.duplicate_of = ticket_id
+    try:
+        ticket_id = f"TCK-{triage.request_fingerprint}"
+        duplicate = await repository.ticket_exists(ticket_id)
+        await repository.create_handoff_ticket(
+            ticket_id,
+            message.customer_id,
+            message.conversation_id,
+            triage.order_id,
+            triage.category,
+            response.answer,
+            triage.priority,
+            {
+                "requestFingerprint": triage.request_fingerprint,
+                "duplicate": duplicate,
+                "intent": response.intent,
+                "confidence": response.confidence,
+                "escalationReason": response.escalation_reason,
+                "missingFacts": response.missing_facts,
+                "citations": [item.model_dump(mode="json") for item in response.citations],
+                "toolCalls": [item.model_dump(mode="json") for item in response.tool_calls],
+                "resolvedContext": response.resolved_context,
+            },
+        )
+        if duplicate:
+            response.duplicate_of = ticket_id
+    except Exception:
+        logger.exception("Handoff ticket persistence failed")
 
 
 class VisionImage(BaseModel):
